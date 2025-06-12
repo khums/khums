@@ -1,0 +1,29 @@
+%%shell
+sudo apt -y update
+sudo apt install -y wget curl unzip
+wget http://archive.ubuntu.com/ubuntu/pool/main/libu/libu2f-host/libu2f-udev_1.1.4-1_all.deb
+dpkg -i libu2f-udev_1.1.4-1_all.deb
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+dpkg -i google-chrome-stable_current_amd64.deb
+
+wget -N https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/118.0.5993.70/linux64/chromedriver-linux64.zip -P /tmp/
+unzip -o /tmp/chromedriver-linux64.zip -d /tmp/
+chmod +x /tmp/chromedriver-linux64/chromedriver
+mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+pip install selenium chromedriver_autoinstaller
+
+
+
+import sys
+sys.path.insert(0,'/usr/lib/chromium-browser/chromedriver')
+
+from selenium import webdriver
+import chromedriver_autoinstaller
+
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless') # this is must
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+chromedriver_autoinstaller.install()
+
+driver = webdriver.Chrome(options=chrome_options)
