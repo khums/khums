@@ -7,6 +7,14 @@ import os
 from pathlib import Path
 
 from rewardkit import criterion
+import sys
+
+# Discovery may import this module with only the tests tree on disk (no
+# PYTHONPATH); in-image runs get tests/ via PYTHONPATH. Support both.
+_TESTS_ROOT = Path(__file__).resolve().parents[1]
+if (_TESTS_ROOT / "support" / "artifact_contract.py").is_file() and str(_TESTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(_TESTS_ROOT))
+
 from support.artifact_contract import plan_sections
 
 
