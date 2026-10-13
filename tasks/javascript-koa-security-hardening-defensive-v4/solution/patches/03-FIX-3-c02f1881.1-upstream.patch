@@ -1,0 +1,95 @@
+From c02f188132dec670549a748224952f1a0c62d7ca Mon Sep 17 00:00:00 2001
+From: fengmk2 <fengmk2@gmail.com>
+Date: Wed, 30 Jul 2025 07:56:37 +0800
+Subject: [PATCH] fix: only allow back redirect to the same origin referer
+ (#1898)
+
+https://github.com/koajs/koa/security/advisories/GHSA-jgmv-j7ww-jx2x
+
+close https://github.com/koajs/koa/issues/1892
+close https://github.com/koajs/koa/issues/1897
+---
+ .github/workflows/node.js.yml  |  2 +-
+ __tests__/response/redirect.js | 16 ++++++++++++++++
+ lib/response.js                | 21 ++++++++++++++++++++-
+ 3 files changed, 37 insertions(+), 2 deletions(-)
+
+diff --git a/.github/workflows/node.js.yml b/.github/workflows/node.js.yml
+index 05ff18dc2..cd15f2142 100644
+--- a/.github/workflows/node.js.yml
++++ b/.github/workflows/node.js.yml
+@@ -13,7 +13,7 @@ jobs:
+ 
+     strategy:
+       matrix:
+-        node-version: [12.x, 14.x, 16.x, 18.x, 20.x, 21.x]
++        node-version: [12.x, 14.x, 16.x, 18.x, 20.x, 22.x]
+ 
+     steps:
+     - uses: actions/checkout@v2
+diff --git a/__tests__/response/redirect.js b/__tests__/response/redirect.js
+index 53b475df3..93ee067be 100644
+--- a/__tests__/response/redirect.js
++++ b/__tests__/response/redirect.js
+@@ -71,6 +71,22 @@ describe('ctx.redirect(url)', () => {
+       ctx.redirect('back');
+       assert.strictEqual(ctx.response.header.location, '/');
+     });
++
++    it('should redirect to the same origin referrer', () => {
++      const ctx = context();
++      ctx.req.headers.host = 'example.com';
++      ctx.req.headers.referrer = 'https://example.com/login';
++      ctx.redirect('back');
++      assert.strictEqual(ctx.response.header.location, 'https://example.com/login');
++    });
++
++    it('should redirect to root if the same origin referrer is not present', () => {
++      const ctx = context();
++      ctx.req.headers.host = 'example.com';
++      ctx.req.headers.referrer = 'https://other.com/login';
++      ctx.redirect('back');
++      assert.strictEqual(ctx.response.header.location, '/');
++    });
+   });
+ 
+   describe('when html is accepted', () => {
+diff --git a/lib/response.js b/lib/response.js
+index b8e2938d0..5b8792fc0 100644
+--- a/lib/response.js
++++ b/lib/response.js
+@@ -240,6 +240,22 @@ module.exports = {
+     vary(this.res, field);
+   },
+ 
++  _getBackReferrer() {
++    const referrer = this.ctx.get('Referrer');
++    if (referrer) {
++      // referrer is a relative path
++      if (referrer.startsWith('/')) {
++        return referrer;
++      }
++
++      // referrer is an absolute URL, check if it's the same origin
++      const url = new URL(referrer, this.ctx.href);
++      if (url.host === this.ctx.host) {
++        return referrer;
++      }
++    }
++  },
++
+   /**
+    * Perform a 302 redirect to `url`.
+    *
+@@ -261,7 +277,10 @@ module.exports = {
+ 
+   redirect(url, alt) {
+     // location
+-    if ('back' === url) url = this.ctx.get('Referrer') || alt || '/';
++    if ('back' === url) {
++      url = this._getBackReferrer() || alt || '/';
++    }
++
+     if (/^https?:\/\//i.test(url)) {
+       // formatting url again avoid security escapes
+       url = new URL(url).toString();

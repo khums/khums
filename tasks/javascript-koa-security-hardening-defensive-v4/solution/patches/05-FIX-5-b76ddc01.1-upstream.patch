@@ -1,0 +1,129 @@
+From b76ddc01fdb703e51652b0fd131d16394cadcfeb Mon Sep 17 00:00:00 2001
+From: killa <killa07071201@gmail.com>
+Date: Wed, 25 Feb 2026 21:24:26 +0800
+Subject: [PATCH] Merge commit from fork
+
+When a malformed Host header containing @ symbol (e.g., "evil.com:fake@legitimate.com")
+is received, use URL parser to correctly extract the actual host portion instead of
+naively splitting by colon which would return attacker-controlled value.
+
+Co-authored-by: Claude Opus 4.5 <noreply@anthropic.com>
+---
+ __tests__/request/host.js     | 44 +++++++++++++++++++++++++++++++++++
+ __tests__/request/hostname.js | 28 ++++++++++++++++++++++
+ lib/request.js                | 12 +++++++++-
+ 3 files changed, 83 insertions(+), 1 deletion(-)
+
+diff --git a/__tests__/request/host.js b/__tests__/request/host.js
+index c64b4af9a..de56c739c 100644
+--- a/__tests__/request/host.js
++++ b/__tests__/request/host.js
+@@ -94,4 +94,48 @@ describe('req.host', () => {
+       });
+     });
+   });
++
++  describe('with Host header containing @', () => {
++    it('should correctly parse host from userinfo@host format', () => {
++      const req = request();
++      req.header.host = 'evil.com:fake@legitimate.com';
++      assert.strictEqual(req.host, 'legitimate.com');
++    });
++
++    it('should correctly parse host from user@host format', () => {
++      const req = request();
++      req.header.host = 'user@example.com';
++      assert.strictEqual(req.host, 'example.com');
++    });
++
++    it('should correctly parse host with port from userinfo@host:port format', () => {
++      const req = request();
++      req.header.host = 'user:pass@example.com:8080';
++      assert.strictEqual(req.host, 'example.com:8080');
++    });
++
++    it('should correctly parse @ in X-Forwarded-Host when proxy is trusted', () => {
++      const req = request();
++      req.app.proxy = true;
++      req.header['x-forwarded-host'] = 'evil.com:fake@legitimate.com';
++      req.header.host = 'foo.com';
++      assert.strictEqual(req.host, 'legitimate.com');
++    });
++
++    it('should correctly parse @ in :authority on HTTP/2', () => {
++      const req = request({
++        httpVersionMajor: 2,
++        httpVersion: '2.0'
++      });
++      req.header[':authority'] = 'evil.com:fake@legitimate.com';
++      req.header.host = 'foo.com';
++      assert.strictEqual(req.host, 'legitimate.com');
++    });
++
++    it('should return empty string for invalid host with @', () => {
++      const req = request();
++      req.header.host = 'user@';
++      assert.strictEqual(req.host, '');
++    });
++  });
+ });
+diff --git a/__tests__/request/hostname.js b/__tests__/request/hostname.js
+index 635cdbbfe..97c1ca4d1 100644
+--- a/__tests__/request/hostname.js
++++ b/__tests__/request/hostname.js
+@@ -70,4 +70,32 @@ describe('req.hostname', () => {
+       });
+     });
+   });
++
++  describe('with Host header containing @', () => {
++    it('should correctly parse hostname from userinfo@host format', () => {
++      const req = request();
++      req.header.host = 'evil.com:fake@legitimate.com';
++      assert.strictEqual(req.hostname, 'legitimate.com');
++    });
++
++    it('should correctly parse hostname from user@host format', () => {
++      const req = request();
++      req.header.host = 'user@example.com';
++      assert.strictEqual(req.hostname, 'example.com');
++    });
++
++    it('should correctly parse hostname with port from userinfo@host:port format', () => {
++      const req = request();
++      req.header.host = 'user:pass@example.com:8080';
++      assert.strictEqual(req.hostname, 'example.com');
++    });
++
++    it('should correctly parse @ in X-Forwarded-Host when proxy is trusted', () => {
++      const req = request();
++      req.app.proxy = true;
++      req.header['x-forwarded-host'] = 'evil.com:fake@legitimate.com';
++      req.header.host = 'foo.com';
++      assert.strictEqual(req.hostname, 'legitimate.com');
++    });
++  });
+ });
+diff --git a/lib/request.js b/lib/request.js
+index c2b0db600..244c59f8e 100644
+--- a/lib/request.js
++++ b/lib/request.js
+@@ -257,7 +257,17 @@ module.exports = {
+       if (!host) host = this.get('Host');
+     }
+     if (!host) return '';
+-    return splitCommaSeparatedValues(host, 1)[0];
++    host = splitCommaSeparatedValues(host, 1)[0];
++    // Host header may contain userinfo (e.g., "user@host") which is invalid per RFC 7230.
++    // Use URL parser to correctly extract the host portion.
++    if (host.includes('@')) {
++      try {
++        host = new URL(`http://${host}`).host;
++      } catch (e) {
++        return '';
++      }
++    }
++    return host;
+   },
+ 
+   /**

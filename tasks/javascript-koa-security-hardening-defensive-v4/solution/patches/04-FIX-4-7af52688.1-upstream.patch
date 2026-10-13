@@ -1,0 +1,93 @@
+From 7af52688333289ac2e21933f039d31f7dfa395e0 Mon Sep 17 00:00:00 2001
+From: "MK (fengmk2)" <fengmk2@gmail.com>
+Date: Sat, 18 Oct 2025 22:30:21 +0800
+Subject: [PATCH] fix: normalize referer before redirect (#1909)
+
+pick from https://github.com/koajs/koa/pull/1908
+---
+ __tests__/response/redirect.js | 29 +++++++++++++++--------------
+ lib/response.js                |  5 -----
+ 2 files changed, 15 insertions(+), 19 deletions(-)
+
+diff --git a/__tests__/response/redirect.js b/__tests__/response/redirect.js
+index 93ee067be..311bec9a9 100644
+--- a/__tests__/response/redirect.js
++++ b/__tests__/response/redirect.js
+@@ -47,46 +47,47 @@ describe('ctx.redirect(url)', () => {
+ 
+   describe('with "back"', () => {
+     it('should redirect to Referrer', () => {
+-      const ctx = context();
++      const ctx = context({ url: '/', headers: { host: 'example.com' } });
+       ctx.req.headers.referrer = '/login';
+       ctx.redirect('back');
+       assert.strictEqual(ctx.response.header.location, '/login');
+     });
+ 
+-    it('should redirect to Referer', () => {
+-      const ctx = context();
+-      ctx.req.headers.referer = '/login';
+-      ctx.redirect('back');
+-      assert.strictEqual(ctx.response.header.location, '/login');
+-    });
+-
+     it('should default to alt', () => {
+-      const ctx = context();
++      const ctx = context({ url: '/', headers: { host: 'example.com' } });
+       ctx.redirect('back', '/index.html');
+       assert.strictEqual(ctx.response.header.location, '/index.html');
+     });
+ 
+     it('should default redirect to /', () => {
+-      const ctx = context();
++      const ctx = context({ url: '/', headers: { host: 'example.com' } });
+       ctx.redirect('back');
+       assert.strictEqual(ctx.response.header.location, '/');
+     });
+ 
+     it('should redirect to the same origin referrer', () => {
+-      const ctx = context();
+-      ctx.req.headers.host = 'example.com';
++      const ctx = context({ url: '/', headers: { host: 'example.com' } });
+       ctx.req.headers.referrer = 'https://example.com/login';
+       ctx.redirect('back');
+       assert.strictEqual(ctx.response.header.location, 'https://example.com/login');
+     });
+ 
+     it('should redirect to root if the same origin referrer is not present', () => {
+-      const ctx = context();
+-      ctx.req.headers.host = 'example.com';
++      const ctx = context({ url: '/', headers: { host: 'example.com' } });
+       ctx.req.headers.referrer = 'https://other.com/login';
+       ctx.redirect('back');
+       assert.strictEqual(ctx.response.header.location, '/');
+     });
++
++    it('should fix Trailing Double-Slash security issue', () => {
++      const ctx = context({ url: '/', headers: { host: 'example.com' } });
++      ctx.req.headers.referrer = '//evil.com/login/';
++      ctx.redirect('back');
++      assert.equal(ctx.response.header.location, '/');
++
++      ctx.redirect('back', '/home');
++      assert.equal(ctx.response.header.location, '/home');
++    });
+   });
+ 
+   describe('when html is accepted', () => {
+diff --git a/lib/response.js b/lib/response.js
+index 5b8792fc0..ae436c42d 100644
+--- a/lib/response.js
++++ b/lib/response.js
+@@ -243,11 +243,6 @@ module.exports = {
+   _getBackReferrer() {
+     const referrer = this.ctx.get('Referrer');
+     if (referrer) {
+-      // referrer is a relative path
+-      if (referrer.startsWith('/')) {
+-        return referrer;
+-      }
+-
+       // referrer is an absolute URL, check if it's the same origin
+       const url = new URL(referrer, this.ctx.href);
+       if (url.host === this.ctx.host) {

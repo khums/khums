@@ -1,0 +1,61 @@
+{
+  "summary": "Request metadata parsing, redirect rendering and navigation, and authority derivation were hardened while preserving supported behavior.",
+  "findings": [
+    {
+      "area": "Request metadata parsing",
+      "trust_boundary": "Client-controlled request and forwarded headers",
+      "root_cause": "A whitespace-tolerant delimiter expression can perform excessive work on adversarial values.",
+      "security_impact": "Disproportionate CPU use while handling a request.",
+      "severity": "high",
+      "affected_code": ["lib/request.js"],
+      "behavior_before_fix": "Whitespace-heavy list values can take excessive time to parse.",
+      "remediation": "Use bounded-cost comma splitting and trim each value.",
+      "behavior_after_fix": "Long list values are parsed promptly while valid list semantics remain available.",
+      "verification": "Local build and protected Jest suite passed (364 passed, 4 skipped); final public reproducer passed 20/20 and revised deterministic suite passed 30/30."
+    },
+    {
+      "area": "Redirect response rendering",
+      "trust_boundary": "Destination value reflected into an HTML response",
+      "root_cause": "The body gave every destination a clickable anchor regardless of URL scheme.",
+      "security_impact": "A user could activate script-capable link content.",
+      "severity": "moderate",
+      "affected_code": ["lib/response.js"],
+      "behavior_before_fix": "An unsafe redirect target appears as a clickable HTML link.",
+      "remediation": "Only safe web targets receive a clickable link; unsafe or malformed targets remain plain text.",
+      "behavior_after_fix": "The response does not expose an unsafe clickable target, and supported redirects keep their normal status and destination.",
+      "verification": "Local build and protected Jest suite passed (364 passed, 4 skipped); final public reproducer passed 20/20 and revised deterministic suite passed 30/30."
+    },
+    {
+      "area": "Back navigation",
+      "trust_boundary": "Untrusted navigation history to Location header",
+      "root_cause": "The history value was accepted without an adequate origin decision, including scheme-relative external destinations.",
+      "security_impact": "A back action can redirect a user to an external site.",
+      "severity": "moderate",
+      "affected_code": ["lib/response.js"],
+      "behavior_before_fix": "An external history value can control the redirect destination.",
+      "remediation": "Accept ordinary relative or same-origin history and otherwise use the supplied alternative or root fallback.",
+      "behavior_after_fix": "External history does not determine Location; supported local history still works.",
+      "verification": "Local build and protected Jest suite passed (364 passed, 4 skipped); final public reproducer passed 20/20 and revised deterministic suite passed 30/30."
+    },
+    {
+      "area": "Authority and hostname interpretation",
+      "trust_boundary": "Client-controlled Host, forwarded host, or HTTP/2 authority to host identity",
+      "root_cause": "Raw authority parsing could assign a spoofed hostname from malformed userinfo-like input.",
+      "security_impact": "Origin and other host-based decisions can use an attacker-chosen identity.",
+      "severity": "moderate",
+      "affected_code": ["lib/request.js"],
+      "behavior_before_fix": "Malformed authority may produce the wrong hostname.",
+      "remediation": "Parse the authority defensively and return no host when it is malformed.",
+      "behavior_after_fix": "Malformed authority does not spoof the hostname while ordinary host forms remain supported.",
+      "verification": "Local build and protected Jest suite passed (364 passed, 4 skipped); final public reproducer passed 20/20 and revised deterministic suite passed 30/30."
+    }
+  ],
+  "preserved_legitimate_behaviors": ["Valid host, port, proxy, and HTTP/2 authority forms", "Normal redirect status, destination, and safe response rendering", "Same-origin and ordinary relative back navigation with fallback"],
+  "verification_runs": [
+    {"command": "npm run build", "result": "Succeeded on local Node.js 24 production-only assembly."},
+    {"command": "npm test -- --runInBand --silent", "result": "364 passed, 4 skipped on local Node.js 24 production-only assembly."},
+    {"command": "Deterministic verifier", "result": "30 passed, 0 failed."},
+    {"command": "RewardKit", "result": "Deterministic, process, and binary reward were 1.0; semantic judge skipped for Oracle run."},
+    {"command": "/testbed/reproducer/run-all.sh", "result": "G1-G4 each PASS 5/5; summary PASS 20/20."}
+  ]
+}

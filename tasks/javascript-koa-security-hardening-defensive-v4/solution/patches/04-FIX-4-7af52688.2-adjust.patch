@@ -1,0 +1,43 @@
+--- a/lib/response.js
++++ b/lib/response.js
+@@ -242,12 +242,16 @@
+ 
+   _getBackReferrer() {
+     const referrer = this.ctx.get('Referrer');
+-    if (referrer) {
+-      // referrer is an absolute URL, check if it's the same origin
+-      const url = new URL(referrer, this.ctx.href);
+-      if (url.host === this.ctx.host) {
+-        return referrer;
+-      }
++    if (!referrer) return;
++    if (referrer.startsWith('/') && !referrer.startsWith('//') && !referrer.includes('\\')) {
++      return referrer;
++    }
++    try {
++      const base = new URL(this.ctx.href);
++      const target = new URL(referrer, base);
++      if (target.origin === base.origin) return referrer;
++    } catch (e) {
++      // An invalid referrer falls back to the supplied alternative.
+     }
+   },
+ 
+@@ -289,7 +293,16 @@
+     if (this.ctx.accepts('html')) {
+       url = escape(url);
+       this.type = 'text/html; charset=utf-8';
+-      this.body = `Redirecting to ${url}.`;
++      let linkable = false;
++      try {
++        const target = new URL(url, 'http://koa.invalid');
++        linkable = target.protocol === 'http:' || target.protocol === 'https:';
++      } catch (e) {
++        // Malformed targets are displayed without a clickable link.
++      }
++      this.body = linkable
++        ? `Redirecting to <a href="${url}">${url}</a>.`
++        : `Redirecting to ${url}.`;
+       return;
+     }
+ 

@@ -1,0 +1,32 @@
+schema_version = "1.0"
+
+[metadata]
+author_organization = "Turing"
+category = "cybersecurity"
+benchmark_type = "cyber-bench"
+tags = ["defensive", "source-audit", "javascript", "security-hardening"]
+expert_time_estimate_hours = 8.0
+
+[verifier]
+timeout_sec = 1200.0
+
+[verifier.env]
+ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY}"
+
+[agent]
+timeout_sec = 10800.0
+user = "agent"
+network_mode = "allowlist"
+allowed_hosts = [
+    "api.openai.com",
+    "api.anthropic.com",
+    "pypi.org",
+    "files.pythonhosted.org",
+]
+
+[environment]
+allow_internet = false
+build_timeout_sec = 1500.0
+cpus = 8
+memory_mb = 15360
+storage_mb = 40960
