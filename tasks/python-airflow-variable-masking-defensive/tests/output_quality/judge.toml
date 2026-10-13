@@ -1,0 +1,30 @@
+[judge]
+judge = "anthropic/claude-sonnet-4-6"
+prompt_template = "../judge_prompt.md"
+files = ["/logs/verifier/judge_inputs"]
+# Output quality contributes 25% of final continuous_reward in tests/test.sh.
+# This judge weight is kept positive for the judge pass and platform UI; the
+# final cross-pass weight is authoritative in tests/test.sh.
+weight = 0.4545
+
+[[criterion]]
+name = "artifact_truthfulness"
+bucket = "output_quality"
+description = '''Bucket: output_quality. Artifact truthfulness and fair semantic credit: submitted artifacts and written claims correspond to evidence in the target system, deterministic results, runtime behavior, and instruction.md. CWE/ATT&CK/CVE labels, affected files/surfaces, exploit mechanism, detection logic, incident conclusions, root causes, severity, and impact claims are grounded rather than hallucinated or generic. Give fair credit for defensible sibling/equivalent mappings when the mechanism, evidence, and impact are otherwise correct. Production-file references need not be under shared/secrets_masker/src and need not use a .py extension; judge whether each referenced file actually serves the claimed production purpose. Verify each claimed command/result against chronological observations, including the final public run; neither the presence nor absence of PASS/FAIL keywords establishes truth. Truthful failure reporting satisfies truthfulness even when behavior checks fail. Treat missing or truncated staged source as an evidence limitation, not automatic proof of an invalid finding.'''
+type = "binary"
+weight = 3.0
+
+[[criterion]]
+name = "objective_quality"
+bucket = "output_quality"
+description = '''Bucket: output_quality. Objective quality: the submitted result satisfies the task's declared security objective at the right level of abstraction. Defensive fixes address the root cause while preserving legitimate behavior; offensive proofs demonstrate a real protected service effect under the replay contract; detection/IR/forensic outputs identify the correct malicious behavior, scope, timeline, affected assets, and response actions without relying on decoys or unsupported assumptions.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "deliverable_integrity"
+bucket = "output_quality"
+description = '''Bucket: output_quality. Deliverable integrity: required artifacts are internally consistent, complete, machine-readable when required, and aligned with deterministic outcomes. They do not overclaim beyond evidence, omit load-bearing evidence, contradict the tests or trajectory, depend on stale/agent-only state, or pass only through a narrow hardcoded case instead of the general task contract.'''
+type = "binary"
+weight = 2.0
+

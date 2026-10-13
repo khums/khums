@@ -1,0 +1,56 @@
+{
+  "public_groups": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "public_timeout": 900,
+  "implicit": [
+    {
+      "id": "depth_regressions",
+      "generator": "deep_secret_fresh",
+      "effect": "depth_masking",
+      "timeout": 120
+    },
+    {
+      "id": "deep_key_variants",
+      "generator": "deep_key_variants",
+      "effect": "depth_masking",
+      "timeout": 120
+    },
+    {
+      "id": "deep_nested_secret_value",
+      "generator": "deep_nested_secret_value",
+      "effect": "depth_masking",
+      "timeout": 120
+    },
+    {
+      "id": "deep_secret_via_list",
+      "generator": "deep_secret_via_list",
+      "effect": "depth_masking",
+      "timeout": 120
+    },
+    {
+      "id": "masker_regressions",
+      "generator": "shallow_secret_control",
+      "effect": "legitimate_masking",
+      "timeout": 120
+    },
+    {
+      "id": "deep_public_preserved",
+      "generator": "deep_public_preserved",
+      "effect": "legitimate_preservation",
+      "timeout": 120
+    },
+    {
+      "id": "upstream_secrets_masker_suite",
+      "command": "PYTHONPATH=shared/secrets_masker/src:devel-common/src python -m pytest -c .checker-pytest.toml -q -p no:cacheprovider shared/secrets_masker/tests",
+      "timeout": 600,
+      "effect": "upstream_compatibility"
+    }
+  ],
+  "private_test_includes": [
+    "shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py"
+  ]
+}

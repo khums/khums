@@ -1,0 +1,37 @@
+{
+  "test_includes": [
+    "shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py"
+  ],
+  "groups": [
+    {
+      "id": "G1",
+      "timeout": 180,
+      "commands": [
+        "python -m pytest -c .checker-pytest.toml -q -p no:cacheprovider shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py -k sensitive_key_past_max_depth"
+      ]
+    },
+    {
+      "id": "G2",
+      "timeout": 180,
+      "commands": [
+        "python -m pytest -c .checker-pytest.toml -q -p no:cacheprovider shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py -k redact_max_depth"
+      ]
+    },
+    {
+      "id": "G3",
+      "timeout": 240,
+      "commands": [
+        "python -m pytest -c .checker-pytest.toml -q -p no:cacheprovider shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py"
+      ]
+    },
+    {
+      "id": "G4",
+      "timeout": 120,
+      "commands": [
+        "python -m compileall -q shared/secrets_masker/src"
+      ]
+    }
+  ],
+  "context": "Public validation exercises secrets masking of structured values, recursion-boundary handling, supported-input compatibility, and source compilation.",
+  "failure_context": "Inspect permitted production source for how nested sensitive values are handled; preserve supported values and public APIs. Group scores are not a complete specification."
+}

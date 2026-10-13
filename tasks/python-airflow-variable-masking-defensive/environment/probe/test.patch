@@ -1,0 +1,116 @@
+From 354391bbccc1658ce66d8ec2e2e415e6a01aa7a4 Mon Sep 17 00:00:00 2001
+From: Jarek Potiuk <jarek@potiuk.com>
+Date: Tue, 12 May 2026 04:48:29 +0200
+Subject: [PATCH] Check sensitive key names before applying recursion-depth
+ cutoff in secrets masker (#65912)
+
+`SecretsMasker._redact` short-circuited on `depth > max_depth` before
+checking whether the current key name was sensitive
+(`should_hide_value_for_key(name)`). For sensitive keys nested beyond
+the recursion depth (default 5), the original value was returned
+unchanged instead of being replaced with `***`.
+
+Move the depth cutoff inside the `try:` block, after the
+sensitive-key check, and let dict traversal continue past the cutoff
+so deeper sensitive keys are still caught. Non-dict containers and
+the string-pattern masker keep the depth-bounded behavior the cutoff
+was added for. JSON-loaded payloads cannot be self-referential, and
+any in-memory cycle hits Python's own recursion limit and falls
+through the existing exception handler to "<redaction-failed>",
+which preserves the fail-closed property.
+
+Generated-by: Claude Opus 4.7 (1M context) following the guidelines at
+https://github.com/apache/airflow/blob/main/contributing-docs/05_pull_requests.rst#gen-ai-assisted-contributions
+---
+ .../secrets_masker/secrets_masker.py          | 18 ++++++---
+ .../secrets_masker/test_secrets_masker.py     | 38 +++++++++++++++++++
+ 2 files changed, 51 insertions(+), 5 deletions(-)
+
+diff --git a/shared/secrets_masker/src/airflow_shared/secrets_masker/secrets_masker.py b/shared/secrets_masker/src/airflow_shared/secrets_masker/secrets_masker.py
+index fb5e10302d7f9..1fc046de5830e 100644
+--- a/shared/secrets_masker/src/airflow_shared/secrets_masker/secrets_masker.py
++++ b/shared/secrets_masker/src/airflow_shared/secrets_masker/secrets_masker.py
+@@ -344,14 +344,18 @@ def _redact_all(
+     def _redact(
+         self, item: Redactable, name: str | None, depth: int, max_depth: int, replacement: str = "***"
+     ) -> Redacted:
+-        # Avoid spending too much effort on redacting on deeply nested
+-        # structures. This also avoid infinite recursion if a structure has
+-        # reference to self.
+-        if depth > max_depth:
+-            return item
+         try:
++            # Key-name-based redaction is unbounded by depth — sensitive keys
++            # must fail closed at any nesting level. The depth cutoff below is
++            # only used to bound the work of pattern-based string masking and
++            # to terminate recursion through self-referential iterables.
+             if name and self.should_hide_value_for_key(name):
+                 return self._redact_all(item, depth, max_depth, replacement=replacement)
++            # Always walk dicts so deeper sensitive keys are still caught;
++            # JSON-loaded payloads cannot be self-referential, and any
++            # in-memory cycle hits Python's own recursion limit and is caught
++            # by the except clause below (which fails closed via
++            # "<redaction-failed>").
+             if isinstance(item, dict):
+                 to_return = {
+                     dict_key: self._redact(
+@@ -360,6 +364,10 @@ def _redact(
+                     for dict_key, subval in item.items()
+                 }
+                 return to_return
++            # Avoid spending too much effort on pattern-based masking of
++            # deeply nested non-dict structures.
++            if depth > max_depth:
++                return item
+             if isinstance(item, Enum):
+                 return self._redact(
+                     item=item.value, name=name, depth=depth, max_depth=max_depth, replacement=replacement
+diff --git a/shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py b/shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py
+index e23cb1c274438..930748e2ed0d0 100644
+--- a/shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py
++++ b/shared/secrets_masker/tests/secrets_masker/test_secrets_masker.py
+@@ -690,6 +690,44 @@ def test_redact_max_depth(self, val, expected, max_depth):
+             got = redact(val, max_depth=max_depth)
+             assert got == expected
+ 
++    @pytest.mark.parametrize(
++        ("val", "expected"),
++        [
++            # Sensitive key at exactly MAX_RECURSION_DEPTH (5) is redacted.
++            (
++                {"a": {"b": {"c": {"d": {"password": "leaked"}}}}},
++                {"a": {"b": {"c": {"d": {"password": "***"}}}}},
++            ),
++            # Sensitive key one level past MAX_RECURSION_DEPTH is also redacted.
++            (
++                {"a": {"b": {"c": {"d": {"e": {"password": "leaked"}}}}}},
++                {"a": {"b": {"c": {"d": {"e": {"password": "***"}}}}}},
++            ),
++            # Two levels past MAX_RECURSION_DEPTH, under a non-sensitive
++            # intermediate key, still fails closed.
++            (
++                {"a": {"b": {"c": {"d": {"e": {"f": {"token": "leaked"}}}}}}},
++                {"a": {"b": {"c": {"d": {"e": {"f": {"token": "***"}}}}}}},
++            ),
++            # Other sensitive key names recognised by should_hide_value_for_key.
++            (
++                {"a": {"b": {"c": {"d": {"e": {"secret": "leaked"}}}}}},
++                {"a": {"b": {"c": {"d": {"e": {"secret": "***"}}}}}},
++            ),
++            (
++                {"a": {"b": {"c": {"d": {"e": {"api_key": "leaked"}}}}}},
++                {"a": {"b": {"c": {"d": {"e": {"api_key": "***"}}}}}},
++            ),
++        ],
++    )
++    def test_redact_sensitive_key_past_max_depth(self, val, expected):
++        secrets_masker = SecretsMasker()
++        configure_secrets_masker_for_test(secrets_masker)
++        with patch(
++            "airflow_shared.secrets_masker.secrets_masker._secrets_masker", return_value=secrets_masker
++        ):
++            assert redact(val) == expected
++
+     def test_redact_with_str_type(self, logger, caplog):
+         """
+         SecretsMasker's re replacer has issues handling a redactable item of type
