@@ -7,7 +7,7 @@ evidence log into a root-owned snapshot, then runs the pytest prepass
 never discovers. RewardKit scores only the precomputed rows in a separate
 minimal suite (`check.py`, `verifier.json`, `process/check.py`).
 
-19 weighted rows:
+15 weighted rows (total weight 69):
 
 | Rows | Weight | Purpose |
 |---|---|---|
@@ -37,7 +37,7 @@ output, verifier-only `case_semantics.md`).
 (output_quality omitted from the denominator when the judge did not run).
 
 ## Oracle evidence
-Baseline `56c0284`: 8/18 behavioral rows fail (G1–G3 and five private cases).
+Per-command matrix (8 public commands, 4 implicit, 6 private = 18): baseline `56c0284` fails 8 (G1–G3 commands and five private cases).
 `FIX-1` alone: 17/18 (fails `non_buffer_backing_sources`). `FIX-1`+`FIX-2`: 18/18.
 
 ## Fallback
