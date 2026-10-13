@@ -20,7 +20,18 @@ import subprocess
 import tempfile
 from urllib.parse import urljoin, urlsplit
 
-import pytest
+try:
+    import pytest
+except ModuleNotFoundError:
+    # RewardKit discovery imports every module under tests/ on hosts without
+    # pytest; keep this file import-safe there. Pytest runs only in the prepass.
+    class _ImportSafePytest:
+        @staticmethod
+        def fixture(*args, **kwargs):
+            if args and callable(args[0]) and not kwargs:
+                return args[0]
+            return lambda fn: fn
+    pytest = _ImportSafePytest()
 
 TESTBED = Path(os.environ.get('TESTBED', '/testbed'))
 BASELINE = Path(os.environ.get('BASELINE_DIR', '/opt/task-baseline'))
