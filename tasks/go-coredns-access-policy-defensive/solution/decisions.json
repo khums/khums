@@ -1,0 +1,4 @@
+{
+  "drop": [],
+  "notes": "All four upstream patches apply cleanly to the baseline with the factory exclude_paths. No adjustments needed. Net change outside tests: plugin.cfg (+4/-3) and core/dnsserver/zdirectives.go (+3/-3). After all four patches, running go generate coredns.go is a no-op."
+}

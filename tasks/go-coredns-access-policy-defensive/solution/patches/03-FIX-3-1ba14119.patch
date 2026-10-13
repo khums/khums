@@ -1,0 +1,205 @@
+From 1ba14119d03c2e07f104072e960393223f392b55 Mon Sep 17 00:00:00 2001
+From: Yong Tang <yong.tang.github@outlook.com>
+Date: Tue, 14 Jul 2026 22:26:49 -0700
+Subject: [PATCH] plugin/acl: Fix blocked clients from receiving cached DNS
+ answers (#8289)
+
+This PR fixes plugin ordering so ACL checks run before cache lookups,
+preventing blocked clients from receiving cached DNS answers populated by allowed clients
+
+Signed-off-by: Yong Tang <yong.tang.github@outlook.com>
+---
+ core/dnsserver/zdirectives.go |   2 +-
+ plugin.cfg                    |   2 +-
+ test/acl_test.go              | 149 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 151 insertions(+), 2 deletions(-)
+ create mode 100644 test/acl_test.go
+
+diff --git a/core/dnsserver/zdirectives.go b/core/dnsserver/zdirectives.go
+index cf39df35..171f8d1a 100644
+--- a/core/dnsserver/zdirectives.go
++++ b/core/dnsserver/zdirectives.go
+@@ -41,9 +41,9 @@ var Directives = []string{
+ 	"chaos",
+ 	"loadbalance",
+ 	"tsig",
+-	"cache",
+ 	"rewrite",
+ 	"acl",
++	"cache",
+ 	"header",
+ 	"dnssec",
+ 	"autopath",
+diff --git a/plugin.cfg b/plugin.cfg
+index a4fc637c..0235cc12 100644
+--- a/plugin.cfg
++++ b/plugin.cfg
+@@ -50,9 +50,9 @@ any:any
+ chaos:chaos
+ loadbalance:loadbalance
+ tsig:tsig
+-cache:cache
+ rewrite:rewrite
+ acl:acl
++cache:cache
+ header:header
+ dnssec:dnssec
+ autopath:autopath
+diff --git a/test/acl_test.go b/test/acl_test.go
+new file mode 100644
+index 00000000..5a24d491
+--- /dev/null
++++ b/test/acl_test.go
+@@ -0,0 +1,149 @@
++package test
++
++import (
++	"fmt"
++	"net"
++	"testing"
++	"time"
++
++	"github.com/miekg/dns"
++)
++
++func TestCacheACLAuthorization(t *testing.T) {
++	const (
++		blockedSource = "127.0.0.1"
++		allowedSource = "127.0.0.2"
++		queryName     = "secret.protected.example."
++	)
++
++	exchange := func(server, source string) *dns.Msg {
++		t.Helper()
++
++		remoteAddr, err := net.ResolveUDPAddr("udp4", server)
++		if err != nil {
++			t.Fatalf("resolve server address %q: %v", server, err)
++		}
++
++		conn, err := net.DialUDP(
++			"udp4",
++			&net.UDPAddr{
++				IP: net.ParseIP(source).To4(),
++			},
++			remoteAddr,
++		)
++		if err != nil {
++			t.Fatalf("dial from %s to %s: %v", source, server, err)
++		}
++		defer conn.Close()
++
++		request := new(dns.Msg)
++		request.SetQuestion(queryName, dns.TypeA)
++
++		client := &dns.Client{
++			Net:     "udp4",
++			Timeout: time.Second,
++		}
++
++		response, _, err := client.ExchangeWithConn(
++			request,
++			&dns.Conn{Conn: conn},
++		)
++		if err != nil {
++			t.Fatalf("query from %s to %s: %v", source, server, err)
++		}
++
++		return response
++	}
++
++	corefile := func(withCache bool) string {
++		cache := ""
++		if withCache {
++			cache = "\n\tcache 30"
++		}
++
++		return fmt.Sprintf(`.:0 {
++	bind 127.0.0.1
++	acl protected.example. {
++		allow net %s/32
++		block
++	}%s
++	template IN A protected.example. {
++		match ^secret[.]protected[.]example[.]$
++		answer "{{ .Name }} 30 IN A 192.0.2.124"
++	}
++}`, allowedSource, cache)
++	}
++
++	requireAnswer := func(response *dns.Msg, description string) {
++		t.Helper()
++
++		if response.Rcode != dns.RcodeSuccess {
++			t.Fatalf(
++				"%s: got rcode %s, want NOERROR",
++				description,
++				dns.RcodeToString[response.Rcode],
++			)
++		}
++
++		if len(response.Answer) != 1 {
++			t.Fatalf(
++				"%s: got answers %v, want one A record",
++				description,
++				response.Answer,
++			)
++		}
++
++		answer, ok := response.Answer[0].(*dns.A)
++		if !ok || !answer.A.Equal(net.ParseIP("192.0.2.124")) {
++			t.Fatalf(
++				"%s: got answers %v, want 192.0.2.124",
++				description,
++				response.Answer,
++			)
++		}
++	}
++
++	// Control: prove that the ACL works correctly without cache.
++	control, controlUDP, _, err := CoreDNSServerAndPorts(corefile(false))
++	if err != nil {
++		t.Fatalf("start no-cache control server: %v", err)
++	}
++
++	requireAnswer(
++		exchange(controlUDP, allowedSource),
++		"no-cache allowed query",
++	)
++
++	response := exchange(controlUDP, blockedSource)
++	if response.Rcode != dns.RcodeRefused {
++		control.Stop()
++		t.Fatalf(
++			"no-cache blocked query: got rcode %s, want REFUSED",
++			dns.RcodeToString[response.Rcode],
++		)
++	}
++
++	control.Stop()
++
++	// Actual regression test: allowed client fills the shared cache.
++	instance, udp, _, err := CoreDNSServerAndPorts(corefile(true))
++	if err != nil {
++		t.Fatalf("start cache server: %v", err)
++	}
++	defer instance.Stop()
++
++	requireAnswer(
++		exchange(udp, allowedSource),
++		"cache-fill allowed query",
++	)
++
++	// This must remain REFUSED. Current vulnerable code returns the
++	// cached NOERROR answer without calling ACL.
++	response = exchange(udp, blockedSource)
++	if response.Rcode != dns.RcodeRefused {
++		t.Fatalf(
++			"blocked query after allowed cache fill: got rcode %s, want REFUSED",
++			dns.RcodeToString[response.Rcode],
++		)
++	}
++}
+-- 
+2.51.0.windows.1
+

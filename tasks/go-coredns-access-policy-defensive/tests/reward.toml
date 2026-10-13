@@ -1,0 +1,8 @@
+# Parsed natively by harbor-rewardkit >= 0.1.5.
+# binary_reward = 1.0 iff every weighted deterministic check passes AND
+#                 /app/output/plan.md exists and is non-empty.
+# threshold = 1.0 is the strict gate; do not use all_pass.
+[[reward]]
+name = "binary_reward"
+aggregation = "threshold"
+threshold = 1.0

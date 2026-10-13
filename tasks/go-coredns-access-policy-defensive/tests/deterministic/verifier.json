@@ -1,0 +1,52 @@
+{
+  "public_groups": [
+    "access-enforcement",
+    "configuration-sync"
+  ],
+  "public_timeout": 900,
+  "private_cases": [
+    {
+      "id": "name_rewrite_bypass",
+      "generator": "name_rewrite_bypass"
+    },
+    {
+      "id": "type_rewrite_bypass",
+      "generator": "type_rewrite_bypass"
+    },
+    {
+      "id": "cache_cross_client",
+      "generator": "cache_cross_client"
+    },
+    {
+      "id": "autopath_expansion_bypass",
+      "generator": "autopath_expansion_bypass"
+    },
+    {
+      "id": "rewrite_allowed_control",
+      "generator": "rewrite_allowed_control"
+    },
+    {
+      "id": "cache_allowed_hit_control",
+      "generator": "cache_allowed_hit_control"
+    },
+    {
+      "id": "autopath_allowed_control",
+      "generator": "autopath_allowed_control"
+    },
+    {
+      "id": "policy_direct_control",
+      "generator": "policy_direct_control"
+    },
+    {
+      "id": "unrelated_resolution_control",
+      "generator": "unrelated_resolution_control"
+    }
+  ],
+  "upstream_packages": [
+    "./plugin/acl/...",
+    "./plugin/rewrite/...",
+    "./plugin/cache/...",
+    "./plugin/autopath/...",
+    "./core/dnsserver/..."
+  ]
+}

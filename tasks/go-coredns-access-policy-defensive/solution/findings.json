@@ -1,0 +1,79 @@
+{
+  "summary": "The DNS server's request-handling pipeline evaluates the access-control policy before name/type transformation and before cache lookup, allowing blocked clients to bypass the policy by exploiting name rewrites, type rewrites, search-path expansion, or a warm cache. The build system's generated source file must also be kept in sync with the policy-ordering configuration.",
+  "findings": [
+    {
+      "area": "DNS request-handling pipeline \u2014 plugin execution order",
+      "trust_boundary": "Client-supplied query name and type evaluated by the policy enforcer before pipeline transformations mutate them",
+      "root_cause": "The policy-enforcement handler is positioned earlier in the execution chain than the name/type transformation handlers. The chain is built from an ordered list of directives; the enforcer's directive has a lower index than the transformation directives, so the enforcer runs first and evaluates the original, pre-transformation query.",
+      "security_impact": "A blocked client can supply a query for an allowed name that is rewritten into a protected zone, or for an allowed type that is rewritten into a blocked type, and receive the protected answer because the enforcer approved the original query before the transformation occurred.",
+      "severity": "high",
+      "affected_code": [
+        "plugin.cfg",
+        "core/dnsserver/zdirectives.go"
+      ],
+      "behavior_before_fix": "Query for an allowed public name that is rewritten to a protected internal name returns the protected answer to a blocked client.",
+      "remediation": "Moved the transformation handlers (rewrite and autopath) to a lower directive index than the policy enforcer, so they run before the enforcer in the chain. The enforcer now evaluates the fully-transformed query.",
+      "behavior_after_fix": "A query rewritten into a protected zone is evaluated by the policy enforcer after the rewrite and returns REFUSED to the blocked client.",
+      "verification": "/testbed/reproducer/run-all.sh: access-enforcement: PASS (7/7); configuration-sync: PASS (2/2); Results: PASS"
+    },
+    {
+      "area": "DNS request-handling pipeline \u2014 cache interaction with policy enforcement",
+      "trust_boundary": "Cached responses served to clients without re-evaluating the access-control policy",
+      "root_cause": "After repositioning the transformation handlers, the cache handler still has a lower directive index than the policy enforcer. On a cache hit the cache handler writes the response and returns without calling the next handler, so the policy enforcer is never reached for cached responses.",
+      "security_impact": "An authorized client populates the cache with a protected answer. A subsequently blocked client issues the same query, hits the cache before the enforcer runs, and receives the cached answer instead of REFUSED.",
+      "severity": "high",
+      "affected_code": [
+        "plugin.cfg",
+        "core/dnsserver/zdirectives.go"
+      ],
+      "behavior_before_fix": "After an allowed client warms the cache, a blocked client receives the cached answer rather than a denial.",
+      "remediation": "Moved the cache handler to a higher directive index than the policy enforcer, so the enforcer runs before cache lookup. Cache hits are only served to clients that have already passed the policy check.",
+      "behavior_after_fix": "A blocked client receives REFUSED even when the same name was previously cached by an allowed client.",
+      "verification": "/testbed/reproducer/run-all.sh: access-enforcement: PASS (7/7); configuration-sync: PASS (2/2); Results: PASS"
+    },
+    {
+      "area": "DNS request-handling pipeline \u2014 search-path expansion interaction with policy enforcement",
+      "trust_boundary": "Search-path-expanded query names evaluated by the policy enforcer before expansion occurs",
+      "root_cause": "The search-path expansion handler has a higher directive index than the policy enforcer. The enforcer approves the original short name; the expansion handler then resolves the expanded fully-qualified name (which may fall in a protected zone) by re-entering the chain, but that re-entry also passes through the enforcer after expansion, allowing the answer to be returned.",
+      "security_impact": "A blocked client queries a short name that is not in any protected zone. Search-path expansion appends a suffix that maps the name into a protected zone. The expanded name resolves and the answer is returned to the blocked client.",
+      "severity": "high",
+      "affected_code": [
+        "plugin.cfg",
+        "core/dnsserver/zdirectives.go"
+      ],
+      "behavior_before_fix": "A short name expanded into a protected zone via search-path suffix returns the protected answer to a blocked client.",
+      "remediation": "Moved the search-path expansion handler to a lower directive index than the policy enforcer (alongside the rewrite handler), so both transformations are applied before the enforcer evaluates the query.",
+      "behavior_after_fix": "A short name that expands into a protected zone is blocked by the policy enforcer after expansion.",
+      "verification": "/testbed/reproducer/run-all.sh: access-enforcement: PASS (7/7); configuration-sync: PASS (2/2); Results: PASS"
+    },
+    {
+      "area": "Build system \u2014 generated source file synchronization",
+      "trust_boundary": "The compiled binary uses the generated source file, not the configuration input; they can diverge silently",
+      "root_cause": "The directive order is specified in a configuration input file. The build system generates a Go source file from that input via a code-generation step. A plain `go build` does not re-run code generation. If the configuration input is updated without regenerating the Go source file, the compiled binary still uses the old, potentially vulnerable order.",
+      "security_impact": "A fix that edits only the configuration input without regenerating the Go source file has no effect on the compiled binary. A future code-generation run would also undo a fix applied only to the generated file.",
+      "severity": "moderate",
+      "affected_code": [
+        "plugin.cfg",
+        "core/dnsserver/zdirectives.go",
+        "core/plugin/zplugin.go"
+      ],
+      "behavior_before_fix": "Editing the configuration input alone does not change the compiled binary. Running code generation after editing only the configuration input produces a diff, indicating the files are out of sync.",
+      "remediation": "Updated both the configuration input and the generated source file atomically, so that running code generation produces no diff.",
+      "behavior_after_fix": "Running `go generate coredns.go` in the patched tree produces no change to any generated file.",
+      "verification": "/testbed/reproducer/run-all.sh: access-enforcement: PASS (7/7); configuration-sync: PASS (2/2); Results: PASS"
+    }
+  ],
+  "preserved_legitimate_behaviors": [
+    "Allowed clients still receive rewritten answers with correct response-name reverting.",
+    "Authorized clients still receive cache hits for names they are permitted to resolve.",
+    "Search-path expansion still works for allowed clients querying names that expand into permitted zones.",
+    "DNS queries with no rewrite, cache, or search-path expansion rules configured resolve normally.",
+    "ACL rules that block specific client networks continue to function correctly for direct queries."
+  ],
+  "verification_runs": [
+    {
+      "command": "/testbed/reproducer/run-all.sh",
+      "result": "access-enforcement: PASS (7/7); configuration-sync: PASS (2/2); Results: PASS"
+    }
+  ]
+}

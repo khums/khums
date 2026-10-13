@@ -1,0 +1,129 @@
+From 18a58b9e898ccd95c3f8ee72a37b95b3d1e3e928 Mon Sep 17 00:00:00 2001
+From: Yong Tang <yong.tang.github@outlook.com>
+Date: Tue, 14 Jul 2026 22:36:06 -0700
+Subject: [PATCH] plugin/acl: Fix autopath from bypassing acl checks (#8290)
+
+This fix prevents CoreDNS `autopath` from bypassing `acl` checks
+when it rewrites an allowed query into a name within an ACL-protected zone.
+
+Signed-off-by: Yong Tang <yong.tang.github@outlook.com>
+---
+ core/dnsserver/zdirectives.go |  2 +-
+ plugin.cfg                    |  2 +-
+ test/acl_autopath_test.go     | 70 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+), 2 deletions(-)
+ create mode 100644 test/acl_autopath_test.go
+
+diff --git a/core/dnsserver/zdirectives.go b/core/dnsserver/zdirectives.go
+index 171f8d1a..ec8d654d 100644
+--- a/core/dnsserver/zdirectives.go
++++ b/core/dnsserver/zdirectives.go
+@@ -42,11 +42,11 @@ var Directives = []string{
+ 	"loadbalance",
+ 	"tsig",
+ 	"rewrite",
++	"autopath",
+ 	"acl",
+ 	"cache",
+ 	"header",
+ 	"dnssec",
+-	"autopath",
+ 	"minimal",
+ 	"template",
+ 	"transfer",
+diff --git a/plugin.cfg b/plugin.cfg
+index 0235cc12..055b08bd 100644
+--- a/plugin.cfg
++++ b/plugin.cfg
+@@ -51,11 +51,11 @@ chaos:chaos
+ loadbalance:loadbalance
+ tsig:tsig
+ rewrite:rewrite
++autopath:autopath
+ acl:acl
+ cache:cache
+ header:header
+ dnssec:dnssec
+-autopath:autopath
+ minimal:minimal
+ template:template
+ transfer:transfer
+diff --git a/test/acl_autopath_test.go b/test/acl_autopath_test.go
+new file mode 100644
+index 00000000..cef82045
+--- /dev/null
++++ b/test/acl_autopath_test.go
+@@ -0,0 +1,70 @@
++package test
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/miekg/dns"
++)
++
++func TestACLAuthorizesAutopathExpandedName(t *testing.T) {
++	resolvConf := filepath.Join(t.TempDir(), "resolv.conf")
++	if err := os.WriteFile(
++		resolvConf,
++		[]byte("search public.example protected.example\n"),
++		0644,
++	); err != nil {
++		t.Fatalf("Could not write resolv.conf: %s", err)
++	}
++
++	corefile := `.:0 {
++		acl protected.example. {
++			block
++		}
++		autopath ` + resolvConf + `
++		hosts {
++			192.0.2.123 secret.protected.example
++		}
++	}`
++
++	server, udp, _, err := CoreDNSServerAndPorts(corefile)
++	if err != nil {
++		t.Fatalf("Could not get CoreDNS serving instance: %s", err)
++	}
++	defer server.Stop()
++
++	tests := []struct {
++		name  string
++		qname string
++	}{
++		{
++			name:  "direct protected query",
++			qname: "secret.protected.example.",
++		},
++		{
++			name:  "autopath expanded protected query",
++			qname: "secret.public.example.",
++		},
++	}
++
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			m := new(dns.Msg)
++			m.SetQuestion(tc.qname, dns.TypeA)
++
++			r, err := dns.Exchange(m, udp)
++			if err != nil {
++				t.Fatalf("Query %q failed: %s", tc.qname, err)
++			}
++			if r.Rcode != dns.RcodeRefused {
++				t.Fatalf(
++					"Query %q: got rcode %s, want REFUSED; answers: %v",
++					tc.qname,
++					dns.RcodeToString[r.Rcode],
++					r.Answer,
++				)
++			}
++		})
++	}
++}
+-- 
+2.51.0.windows.1
+

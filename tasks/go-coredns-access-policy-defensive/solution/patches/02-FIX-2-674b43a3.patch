@@ -1,0 +1,44 @@
+From 674b43a353b69056c32e416648629e4155efa396 Mon Sep 17 00:00:00 2001
+From: Ville Vesilehto <ville@vesilehto.fi>
+Date: Tue, 31 Mar 2026 00:43:31 +0300
+Subject: [PATCH] fix: add proxyproto to plugin.cfg and regenerate (#7986)
+
+---
+ core/dnsserver/zdirectives.go | 2 +-
+ plugin.cfg                    | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/core/dnsserver/zdirectives.go b/core/dnsserver/zdirectives.go
+index f6496280..cf39df35 100644
+--- a/core/dnsserver/zdirectives.go
++++ b/core/dnsserver/zdirectives.go
+@@ -37,13 +37,13 @@ var Directives = []string{
+ 	"dnstap",
+ 	"local",
+ 	"dns64",
+-	"acl",
+ 	"any",
+ 	"chaos",
+ 	"loadbalance",
+ 	"tsig",
+ 	"cache",
+ 	"rewrite",
++	"acl",
+ 	"header",
+ 	"dnssec",
+ 	"autopath",
+diff --git a/plugin.cfg b/plugin.cfg
+index 0d735cef..a4fc637c 100644
+--- a/plugin.cfg
++++ b/plugin.cfg
+@@ -24,6 +24,7 @@ metadata:metadata
+ geoip:geoip
+ cancel:cancel
+ tls:tls
++proxyproto:proxyproto
+ quic:quic
+ grpc_server:grpc_server
+ https:https
+-- 
+2.51.0.windows.1
+
