@@ -1,0 +1,50 @@
+[judge]
+judge = "openai/gpt-5.6-terra"
+reasoning_effort = "high"
+prompt_template = "../judge_prompt.md"
+files = ["/logs/verifier/judge_inputs"]
+# Process contributes 20% of final continuous_reward in tests/test.sh, gated by
+# process/check.py. This judge weight is kept positive for the judge pass and UI.
+weight = 0.3636
+
+[[criterion]]
+name = "subsystem_identification"
+bucket = "process"
+description = '''Bucket: process. Subsystem identification: trajectory.json and plan.md show that the agent identified the relevant in-scope subsystem(s) actually exercised by the reproducer -- any of: the HTTP request-routing layer that turns a caller-supplied request identifier into an on-disk storage key, the package-installation layer that turns a fetched archive's entry names into on-disk files, or the static/app file-serving layer that turns a request path into an on-disk file to read -- before making substantive changes in that area. The agent located the correct production file(s) under /testbed for each defect it addressed, rather than guessing generic subsystems or patching an unrelated layer.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "root_cause_tracing"
+bucket = "process"
+description = '''Bucket: process. Root-cause tracing: for each defect the agent addressed, it traced the finding to its underlying trust boundary violation -- untrusted, caller-controlled input (a request header, an archive entry name, or a request path) being joined into a filesystem path without confinement -- rather than only patching a surface symptom (e.g. blanket-rejecting a whole feature, or only string-matching one literal traversal payload such as a bare ".." substring). The reasoning connects the code-level root cause to the security impact (files written/read outside the intended directory).'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "strategy_quality"
+bucket = "process"
+description = '''Bucket: process. Strategy quality: for each defect the agent addressed, it chose a targeted fix that confines the untrusted input to its intended base directory before use, while preserving legitimate behavior -- including request paths or filenames that merely contain ".." as a substring, or that lexically cancel out to a location still inside the intended directory. Credit any general implementation that achieves real confinement, not just the exact upstream approach, and do not penalize a fix that is more permissive of harmless inputs than upstream's own validation as long as it blocks genuine escapes. Do not require particular helper names, exact file names, local structure, or patch shape beyond what instruction.md and the reproducer actually require.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "verification_quality"
+bucket = "process"
+description = '''Bucket: process. Verification quality: for each defect the agent addressed, it verified both sides of the fix -- the malicious input no longer escapes the intended directory, and legitimate requests (including edge cases like benign ".." substrings or self-canceling relative paths) still succeed and produce correct content. Evidence from the public reproducer, manual HTTP requests, or targeted test runs appears in trajectory.json or plan.md. The agent did not rely on the reproducer passing alone without checking regressions.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "evidence_use_self_undermining"
+bucket = "process"
+description = '''Bucket: process. Evidence use and self-undermining: the agent used reproducer output, source inspection, and test feedback coherently. It did not abandon a correct fix, ignore clear failing-check evidence, revert a good patch, or overfit to one specific malicious payload when the fix needed to be general.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "expected_vs_actual_deviation_analysis"
+bucket = "process"
+description = '''Bucket: process. Expected-vs-actual deviation analysis: trajectory.json and plan.md show that the agent compared what instruction.md required against what its patch actually achieved, identified where any remaining gap occurred, and considered whether a failing reproducer case was a genuine security miss, a false positive, or a regression before concluding.'''
+type = "binary"
+weight = 2.0

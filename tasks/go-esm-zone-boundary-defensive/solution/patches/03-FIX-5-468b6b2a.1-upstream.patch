@@ -1,0 +1,38 @@
+From 468b6b2a4b4dfec334cf6b33b01fcd4e5cd93bed Mon Sep 17 00:00:00 2001
+From: Je Xia <i@jex.me>
+Date: Thu, 23 Jul 2026 19:44:57 +0800
+Subject: [PATCH] Harden module resolution, registry auth, and web path
+ handling (#1376)
+
+* fix(server): prevent npm credentials leaking to cross-origin tarballs
+
+* fix(web): prevent path traversal outside app directory
+---
+ web/handler.go | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/web/handler.go b/web/handler.go
+index 83c2ef02c..4c698a10f 100644
+--- a/web/handler.go
++++ b/web/handler.go
+@@ -61,6 +61,11 @@ func NewHandler(config Config) *Handler {
+
+ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+ 	pathname := r.URL.Path
++	localPath := filepath.FromSlash(strings.TrimPrefix(pathname, "/"))
++	if strings.IndexByte(localPath, 0) >= 0 || (localPath != "" && !filepath.IsLocal(localPath)) {
++		http.Error(w, "Bad Request", http.StatusBadRequest)
++		return
++	}
+ 	switch pathname {
+ 	case "/@hmr", "/@refresh", "/@prefresh", "/@vdr":
+ 		s.ServeInternalJS(w, r, pathname[2:])
+@@ -71,7 +76,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+ 		}
+ 		s.ServeHmrWS(w, r)
+ 	default:
+-		filename := filepath.Join(s.config.AppDir, pathname)
++		filename := filepath.Join(s.config.AppDir, localPath)
+ 		fi, err := os.Lstat(filename)
+ 		if err == nil && fi.IsDir() {
+ 			if pathname != "/" && !strings.HasSuffix(pathname, "/") {

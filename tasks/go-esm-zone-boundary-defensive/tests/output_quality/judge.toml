@@ -1,0 +1,35 @@
+[judge]
+judge = "openai/gpt-5.6-terra"
+reasoning_effort = "high"
+prompt_template = "../judge_prompt.md"
+files = ["/logs/verifier/judge_inputs"]
+# Output quality contributes 25% of final continuous_reward in tests/test.sh.
+# This judge weight is kept positive for the judge pass and platform UI; the
+# final cross-pass weight is authoritative in tests/test.sh.
+weight = 0.25
+
+[[criterion]]
+name = "artifact_truthfulness"
+bucket = "output_quality"
+description = '''Bucket: output_quality. Artifact truthfulness: every factual claim in plan.md and findings.json is supported by staged evidence. Check claim by claim, citing the claim and the evidence:
+(1) Production changes: each location claimed as modified or remediated has a corresponding hunk in submission.diff; a location only investigated must be described as unchanged.
+(2) Behavior claims (behavior_before_fix, behavior_after_fix, "no regression", "legitimate behavior preserved", and any statement about how the baseline behaved) must agree with the deterministic rows and with what trajectory.json actually observed. A claim contradicted by a failed deterministic row is false: if any legitimate-behavior row listed in case_semantics.md (for example H05, H07, H08, H09, H15, C, D, H, J) failed, a claim that legitimate behavior was preserved or that no regression occurred is untruthful. A claim that the baseline also failed a verifier-only row (H01-H15) is unsupported unless trajectory.json shows the candidate observing that exact behavior on the unmodified source; the candidate cannot see those rows.
+(3) Verification evidence: each finding's `verification` must cite a run that actually exercises that finding. Use case_semantics.md to map public cases A-E to the surfaces they cover. Compilation, `go vet`, linting, or an aggregate reproducer run whose cases do not cover the finding's surface (the public reproducer has no case for outbound fetch, SSRF, DNS, redirect, or authentication behavior) does not verify that finding; such a finding needs a targeted request or test shown in trajectory.json, otherwise its verification claim is unsupported.
+(4) Each preserved_legitimate_behaviors entry must be backed by an observed validation or a concrete source-level reason, and must not be contradicted by a failed deterministic row or a diff hunk that removes that behavior.
+Truthful failure reporting satisfies this criterion even when behavior checks fail. FAIL when any claim above is false or unsupported, naming the claim and the contradicting or missing evidence.'''
+type = "binary"
+weight = 3.0
+
+[[criterion]]
+name = "objective_quality"
+bucket = "output_quality"
+description = '''Bucket: output_quality. Objective quality: the submitted change closes the identified path-confinement defects at the trust boundary (caller-controlled zone identifiers, archive entry names, and request paths are confined to their intended base directory) AND preserves legitimate behavior. Deterministic rows are authoritative for the outcome: a failed security row means the objective was not met, and a failed legitimate-behavior row (see case_semantics.md: for example H05 self-cancelling archive entry, H07 '..' as a filename substring, H08 self-cancelling request path, H09 literal backslash in a filename, H15 '..' substring in a package file name, and public controls C, D, H, J) is concrete evidence of an over-broad change that rejects or breaks supported input. Also FAIL when a specific hunk in submission.diff removes, narrows, or rewrites legitimate behavior outside the identified defects without a defect-linked justification and targeted evidence: documented options or configured trusted sources (such as a configured package registry) stop being honored, outbound fetch, DNS, redirect, authentication, or host-allowlist policy is rewritten, or status codes, headers, content types, or cache semantics for legitimate requests change. Do not fail on breadth alone or on a hypothetical risk; cite the failed row or the hunk and the behavior it changes. Judge the final outcome, not the agent's method.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "deliverable_integrity"
+bucket = "output_quality"
+description = '''Bucket: output_quality. Deliverable integrity: plan.md and findings.json are complete, internally consistent with each other and with instruction.md's required structure, every affected_code entry names an existing in-scope production file under /testbed, and the final verification_runs entry records /testbed/reproducer/run-all.sh with the result actually observed in trajectory.json. FAIL if the artifacts contradict each other, claim a run or result that trajectory.json does not show, or report a public status that differs from the final observed run.'''
+type = "binary"
+weight = 2.0

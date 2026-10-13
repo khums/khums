@@ -1,0 +1,11 @@
+--- a/web/utils.go
++++ b/web/utils.go
+@@ -57,7 +57,7 @@
+ 	ast, pass := js_parser.Parse(log, logger.Source{
+ 		Index:          0,
+ 		KeyPath:        logger.Path{Text: "<stdin>"},
+-		PrettyPath:     "<stdin>",
++		PrettyPaths:    logger.PrettyPaths{Abs: "<stdin>", Rel: "<stdin>"},
+ 		IdentifierName: "stdin",
+ 		Contents:       string(data),
+ 	}, parserOpts)

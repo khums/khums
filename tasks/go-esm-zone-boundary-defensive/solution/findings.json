@@ -1,0 +1,56 @@
+{
+  "summary": "Three related path-confinement defects across esm.sh's request/storage/web-serving trust boundaries let untrusted input (an HTTP header, a tarball entry name, and a raw URL request path) reach filesystem write/read operations without being confined to its intended base directory, enabling arbitrary file write and/or read outside the intended root in each case.",
+  "findings": [
+    {
+      "area": "server/router.go POST /transform and GET /+<hash>.<ext> handlers, server/build_resolver.go normalizeSavePath",
+      "trust_boundary": "Untrusted, unauthenticated HTTP request header (X-Zone-Id) incorporated into an on-disk storage key",
+      "root_cause": "normalizeSavePath prepends the caller-supplied X-Zone-Id header value directly to the storage key with no validation; fsStorage.Put/Get then resolve that key via filepath.Join(fs.root, key), which lets a sufficient run of '../' segments in the header escape fs.root.",
+      "security_impact": "Arbitrary file write (via POST /transform) and arbitrary file read (via GET /+<hash>.<ext>) outside the configured storage root, reachable by any unauthenticated client that can set an HTTP header (CWE-22), potentially escalating to remote code execution or persistence if the written file is later loaded or executed.",
+      "severity": "high",
+      "affected_code": ["server/router.go"],
+      "behavior_before_fix": "An X-Zone-Id header containing path-traversal segments is accepted and used to construct the storage key without validation, allowing the resulting file write/read to land outside the intended storage root.",
+      "remediation": "X-Zone-Id is now validated as a syntactically valid domain (valid.IsDomain) at both the write and read call sites and discarded (treated as absent) when invalid, before it can reach normalizeSavePath.",
+      "behavior_after_fix": "A path-traversal or otherwise non-domain X-Zone-Id value is ignored; the request proceeds as if no X-Zone-Id header were sent, and no file is written or read outside the storage root.",
+      "verification": "/testbed/reproducer/run-all.sh"
+    },
+    {
+      "area": "server/npmrc.go extractPackageTarball",
+      "trust_boundary": "Untrusted tar entry names inside a package tarball fetched from a configured npm registry",
+      "root_cause": "Entry names are normalized with path.Clean after stripping only the tarball's first path segment; path.Clean does not confine a relative path to a base directory, so a crafted entry name with enough '../' segments still escapes the package's extraction directory when joined via path.Join.",
+      "security_impact": "Arbitrary file write outside the package install directory during normal package installation/build (CWE-22), reachable via any tarball the server ever fetches and extracts.",
+      "severity": "high",
+      "affected_code": ["server/npmrc.go"],
+      "behavior_before_fix": "A tarball entry name containing path-traversal segments extracts to a location outside the intended node_modules/<pkg> directory.",
+      "remediation": "Entry names are now normalized with utils.NormalizePathname (absolute-rooted, so leading '../' segments collapse at the root instead of escaping) before the first-segment strip and join.",
+      "behavior_after_fix": "A crafted traversal entry name resolves to a path inside the package directory (or is otherwise confined); no file is written outside it.",
+      "verification": "/testbed/reproducer/run-all.sh"
+    },
+    {
+      "area": "web/handler.go Handler.ServeHTTP default route (root module's serve/dev commands, a separate built program from server/esmd), web/utils.go validateModule",
+      "trust_boundary": "The raw, attacker-controlled HTTP request URL path",
+      "root_cause": "The default (non-special-cased) route joins the raw request path directly into the configured app directory via filepath.Join with no traversal or NUL-byte validation before Lstat/serving the file. web/utils.go additionally required an unrelated one-line compile-compatibility fix (a logger.Source struct field renamed by the pinned esbuild-internal dependency) so this program compiles at all; that change carries no security impact of its own.",
+      "security_impact": "Arbitrary file read outside the configured application directory, reachable by any unauthenticated HTTP client against the root module's own serve/dev commands (CWE-22).",
+      "severity": "high",
+      "affected_code": ["web/handler.go", "web/utils.go"],
+      "behavior_before_fix": "A request path containing traversal segments (or an embedded NUL byte) resolves to, and serves, a file outside the app directory.",
+      "remediation": "The request path is validated (filepath.IsLocal after stripping the leading slash, plus a NUL-byte check) before being joined into the app directory; invalid paths are rejected with 400.",
+      "behavior_after_fix": "A crafted traversal or NUL-containing request path is rejected with 400 instead of reaching the filesystem; legitimate requests for existing in-app-directory files are served unchanged.",
+      "verification": "/testbed/reproducer/run-all.sh"
+    }
+  ],
+  "preserved_legitimate_behaviors": [
+    "Requests with no X-Zone-Id header continue to build/cache/retrieve transforms under the unzoned (root) storage prefix.",
+    "Requests with a syntactically valid domain X-Zone-Id continue to be stored/retrieved under that zone's own prefix.",
+    "POST /transform and GET /+<hash>.<ext> response shapes and status codes for well-formed requests are unchanged.",
+    "Well-formed package tarballs, including nested legitimate paths, continue to extract to their expected locations.",
+    "Requests for files that genuinely exist inside the configured app directory continue to be served exactly as before."
+  ],
+  "verification_runs": [
+    {"command": "git apply --check solution/patches/01-FIX-1-833a29f4.1-upstream.patch (against baseline e5296da4)", "result": "applies cleanly, verified via local clone"},
+    {"command": "patch -p1 --fuzz=5 --dry-run < solution/patches/02-FIX-2-c62ab83c.1-upstream.patch", "result": "11/12 hunks apply; remaining hunk covered by the documented adjustment solution/patches/02-FIX-2-c62ab83c.2-adjust.patch (verified to apply cleanly on top)"},
+    {"command": "patch -p1 --fuzz=5 --dry-run < solution/patches/03-FIX-5-468b6b2a.1-upstream.patch", "result": "applies with fuzz (offset hunks), verified via local clone"},
+    {"command": "go build -o esmd ./server/esmd && go build -o esmcli . (against the fully composed 3-fix tree)", "result": "both build successfully in a real golang:1.25-alpine container"},
+    {"command": "real end-to-end HTTP exploit test: esmcli serve against a temp app dir, GET /../victim/secret.txt", "result": "pre-fix: 200 OK, secret disclosed; post-fix: 400 Bad Request, secret not disclosed; legitimate GET / unaffected in both"},
+    {"command": "/testbed/reproducer/run-all.sh", "result": "Executed against the real built image: Case A: PASS, Case B: PASS, Case C: PASS, Case D: PASS, Case E: PASS."}
+  ]
+}

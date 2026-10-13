@@ -1,0 +1,264 @@
+From c62ab83c589e7b421a0e1376d2a00a4e48161093 Mon Sep 17 00:00:00 2001
+From: Je Xia <i@jex.me>
+Date: Fri, 16 Jan 2026 13:19:25 +0800
+Subject: [PATCH] Fix path traversal vulnerability in `extractPackageTarball`
+ function (#1287)
+
+---
+ server/npmrc.go      |  45 ++++++++++---------
+ server/npmrc_test.go | 101 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 125 insertions(+), 21 deletions(-)
+ create mode 100644 server/npmrc_test.go
+
+diff --git a/server/npmrc.go b/server/npmrc.go
+index 322614ecd..ccd8c053e 100644
+--- a/server/npmrc.go
++++ b/server/npmrc.go
+@@ -13,7 +13,7 @@ import (
+ 	"net/http"
+ 	"net/url"
+ 	"os"
+-	"path"
++	"path/filepath"
+ 	"slices"
+ 	"sort"
+ 	"strings"
+@@ -109,7 +109,7 @@ func NewNpmRcFromJSON(jsonData []byte) (npmrc *NpmRC, err error) {
+ }
+ 
+ func (rc *NpmRC) StoreDir() string {
+-	return path.Join(config.WorkDir, "npm")
++	return filepath.Join(config.WorkDir, "npm")
+ }
+ 
+ func (npmrc *NpmRC) getRegistryByPackageName(packageName string) *NpmRegistry {
+@@ -243,7 +243,7 @@ func (npmrc *NpmRC) getPackageInfo(pkgName string, version string) (packageJson
+ 	return withCache(getCacheKey(pkgName, version), time.Duration(config.NpmQueryCacheTTL)*time.Second, func() (*npm.PackageJSON, string, error) {
+ 		if !npm.IsDistTag(version) && npm.IsExactVersion(version) {
+ 			var raw npm.PackageJSONRaw
+-			pkgJsonPath := path.Join(npmrc.StoreDir(), pkgName+"@"+version, "node_modules", pkgName, "package.json")
++			pkgJsonPath := filepath.Join(npmrc.StoreDir(), pkgName+"@"+version, "node_modules", pkgName, "package.json")
+ 			if utils.ParseJSONFile(pkgJsonPath, &raw) == nil {
+ 				return raw.ToNpmPackage(), "", nil
+ 			}
+@@ -304,8 +304,8 @@ func (npmrc *NpmRC) getPackageInfoByDate(pkgName string, dateVersion string) (pa
+ }
+ 
+ func (npmrc *NpmRC) installPackage(pkg npm.Package) (packageJson *npm.PackageJSON, err error) {
+-	installDir := path.Join(npmrc.StoreDir(), pkg.String())
+-	packageJsonPath := path.Join(installDir, "node_modules", pkg.Name, "package.json")
++	installDir := filepath.Join(npmrc.StoreDir(), pkg.String())
++	packageJsonPath := filepath.Join(installDir, "node_modules", pkg.Name, "package.json")
+ 
+ 	// check if the package has been installed
+ 	var raw npm.PackageJSONRaw
+@@ -331,12 +331,12 @@ func (npmrc *NpmRC) installPackage(pkg npm.Package) (packageJson *npm.PackageJSO
+ 			buf := bytes.NewBuffer(nil)
+ 			buf.WriteString(`{"name":"` + pkg.Name + `","version":"` + pkg.Version + `"`)
+ 			var denoJson *npm.PackageJSON
+-			if deonJsonPath := path.Join(installDir, "node_modules", pkg.Name, "deno.json"); existsFile(deonJsonPath) {
++			if deonJsonPath := filepath.Join(installDir, "node_modules", pkg.Name, "deno.json"); existsFile(deonJsonPath) {
+ 				var raw npm.PackageJSONRaw
+ 				if utils.ParseJSONFile(deonJsonPath, &raw) == nil {
+ 					denoJson = raw.ToNpmPackage()
+ 				}
+-			} else if deonJsoncPath := path.Join(installDir, "node_modules", pkg.Name, "deno.jsonc"); existsFile(deonJsoncPath) {
++			} else if deonJsoncPath := filepath.Join(installDir, "node_modules", pkg.Name, "deno.jsonc"); existsFile(deonJsoncPath) {
+ 				data, err := os.ReadFile(deonJsoncPath)
+ 				if err == nil {
+ 					var raw npm.PackageJSONRaw
+@@ -383,7 +383,7 @@ func (npmrc *NpmRC) installPackage(pkg npm.Package) (packageJson *npm.PackageJSO
+ 			return nil, fetchErr
+ 		}
+ 		if info.Deprecated != "" {
+-			os.WriteFile(path.Join(installDir, "deprecated.txt"), []byte(info.Deprecated), 0644)
++			os.WriteFile(filepath.Join(installDir, "deprecated.txt"), []byte(info.Deprecated), 0644)
+ 		}
+ 		err = fetchPackageTarball(npmrc.getRegistryByPackageName(pkg.Name), installDir, info.Name, info.Dist.Tarball)
+ 	}
+@@ -446,13 +446,13 @@ func (npmrc *NpmRC) installDependencies(wd string, pkgJson *npm.PackageJSON, npm
+ 				return
+ 			}
+ 			// link the installed package to the node_modules directory of current build context
+-			linkDir := path.Join(wd, "node_modules", name)
++			linkDir := filepath.Join(wd, "node_modules", name)
+ 			_, err = os.Lstat(linkDir)
+ 			if err != nil && os.IsNotExist(err) {
+ 				if strings.ContainsRune(name, '/') {
+-					ensureDir(path.Dir(linkDir))
++					ensureDir(filepath.Dir(linkDir))
+ 				}
+-				os.Symlink(path.Join(npmrc.StoreDir(), pkg.String(), "node_modules", pkg.Name), linkDir)
++				os.Symlink(filepath.Join(npmrc.StoreDir(), pkg.String(), "node_modules", pkg.Name), linkDir)
+ 			}
+ 			// install dependencies recursively
+ 			if len(installed.Dependencies) > 0 || (len(installed.PeerDependencies) > 0 && npmMode) {
+@@ -465,8 +465,8 @@ func (npmrc *NpmRC) installDependencies(wd string, pkgJson *npm.PackageJSON, npm
+ 
+ // If the package is deprecated, a depreacted.txt file will be created by the `intallPackage` function
+ func (npmrc *NpmRC) isDeprecated(pkgName string, pkgVersion string) (string, error) {
+-	installDir := path.Join(npmrc.StoreDir(), pkgName+"@"+pkgVersion)
+-	data, err := os.ReadFile(path.Join(installDir, "deprecated.txt"))
++	installDir := filepath.Join(npmrc.StoreDir(), pkgName+"@"+pkgVersion)
++	data, err := os.ReadFile(filepath.Join(installDir, "deprecated.txt"))
+ 	if err != nil {
+ 		if os.IsNotExist(err) {
+ 			return "", nil
+@@ -532,7 +532,7 @@ func extractPackageTarball(installDir string, pkgName string, tarball io.Reader)
+ 		return
+ 	}
+ 
+-	pkgDir := path.Join(installDir, "node_modules", pkgName)
++	pkgDir := filepath.Join(installDir, "node_modules", pkgName)
+ 
+ 	// extract tarball
+ 	tr := tar.NewReader(unziped)
+@@ -544,9 +544,6 @@ func extractPackageTarball(installDir string, pkgName string, tarball io.Reader)
+ 		if err != nil {
+ 			return err
+ 		}
+-		// strip tarball root dir
+-		_, name := utils.SplitByFirstByte(h.Name, '/')
+-		filename := path.Join(pkgDir, path.Clean(name))
+ 		if h.Typeflag != tar.TypeReg {
+ 			continue
+ 		}
+@@ -554,13 +551,19 @@ func extractPackageTarball(installDir string, pkgName string, tarball io.Reader)
+ 		if h.Size > maxAssetFileSize {
+ 			continue
+ 		}
+-		extname := path.Ext(filename)
++		// normalize the filename
++		_, filename := utils.SplitByFirstByte(utils.NormalizePathname(h.Name)[1:], '/')
++		if filename == "" {
++			continue
++		}
++		savepath := filepath.Join(pkgDir, filename)
++		extname := filepath.Ext(savepath)
+ 		if !(extname != "" && (assetExts[extname[1:]] || slices.Contains(moduleExts, extname) || extname == ".map" || extname == ".css" || extname == ".svelte" || extname == ".vue")) {
+ 			// ignore unsupported formats
+ 			continue
+ 		}
+-		ensureDir(path.Dir(filename))
+-		f, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
++		ensureDir(filepath.Dir(savepath))
++		f, err := os.OpenFile(savepath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -570,7 +573,7 @@ func extractPackageTarball(installDir string, pkgName string, tarball io.Reader)
+ 			return err
+ 		}
+ 		if n != h.Size {
+-			return errors.New("extractPackageTarball: incomplete file: " + name)
++			return errors.New("extractPackageTarball: incomplete file: " + savepath)
+ 		}
+ 	}
+ 
+diff --git a/server/npmrc_test.go b/server/npmrc_test.go
+new file mode 100644
+index 000000000..eb92a10dd
+--- /dev/null
++++ b/server/npmrc_test.go
+@@ -0,0 +1,101 @@
++package server
++
++import (
++	"archive/tar"
++	"bytes"
++	"compress/gzip"
++	"crypto/rand"
++	"encoding/hex"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestExtractPackageTarball(t *testing.T) {
++	b := make([]byte, 16)
++	rand.Read(b)
++	installDir := filepath.Join(os.TempDir(), hex.EncodeToString(b))
++	defer os.RemoveAll(installDir)
++
++	// Create a malicious tarball with path traversal
++	var buf bytes.Buffer
++	gw := gzip.NewWriter(&buf)
++	tw := tar.NewWriter(gw)
++
++	// Add a normal file
++	content := []byte("export const foo = 'bar';")
++	header := &tar.Header{
++		Name:     "package/index.js",
++		Mode:     0644,
++		Size:     int64(len(content)),
++		Typeflag: tar.TypeReg,
++	}
++	if err := tw.WriteHeader(header); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := tw.Write(content); err != nil {
++		t.Fatal(err)
++	}
++
++	// Add a large file
++	largeContent := make([]byte, 1024*1024*51)
++	rand.Read(largeContent)
++	header = &tar.Header{
++		Name:     "package/large.txt",
++		Mode:     0644,
++		Size:     int64(len(largeContent)),
++		Typeflag: tar.TypeReg,
++	}
++	if err := tw.WriteHeader(header); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := tw.Write(largeContent); err != nil {
++		t.Fatal(err)
++	}
++
++	// add a link
++	header = &tar.Header{
++		Name:     "package/passwd.txt",
++		Mode:     0644,
++		Typeflag: tar.TypeLink,
++		Linkname: "/etc/passwd",
++	}
++	if err := tw.WriteHeader(header); err != nil {
++		t.Fatal(err)
++	}
++
++	// Add a malicious file with path traversal
++	bad := []byte("bad")
++	header = &tar.Header{
++		Name:     "/../../../bad/bad.txt",
++		Mode:     0644,
++		Size:     int64(len(bad)),
++		Typeflag: tar.TypeReg,
++	}
++	if err := tw.WriteHeader(header); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := tw.Write(bad); err != nil {
++		t.Fatal(err)
++	}
++
++	tw.Close()
++	gw.Close()
++
++	// Call extractPackageTarball with the malicious tarball
++	if err := extractPackageTarball(installDir, "test-package", bytes.NewReader(buf.Bytes())); err != nil {
++		t.Errorf("extractPackageTarball returned error: %v", err)
++	}
++	if !existsFile(filepath.Join(installDir, "node_modules", "test-package", "index.js")) {
++		t.Fatal("index.js should be extracted")
++	}
++	if existsFile(filepath.Join(installDir, "node_modules", "test-package", "large.txt")) {
++		t.Fatal("large.txt should not be extracted")
++	}
++	if existsFile(filepath.Join(installDir, "node_modules", "test-package", "passwd.txt")) {
++		t.Fatal("passwd.txt should not be extracted")
++	}
++	if !existsFile(filepath.Join(installDir, "node_modules", "test-package", "bad.txt")) {
++		t.Fatal("bad.txt should be extracted in the root directory")
++	}
++}

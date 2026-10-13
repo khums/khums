@@ -1,0 +1,23 @@
+diff --git a/server/npmrc.go b/server/npmrc.go
+index 98500148..7fea59f1 100644
+--- a/server/npmrc.go
++++ b/server/npmrc.go
+@@ -110,7 +110,7 @@ func NewNpmRcFromJSON(jsonData []byte) (npmrc *NpmRC, err error) {
+ 
+ func (rc *NpmRC) StoreDir() string {
+ 	if rc.zoneId != "" {
+-		return path.Join(config.WorkDir, "npm-"+rc.zoneId)
++		return filepath.Join(config.WorkDir, "npm-"+rc.zoneId)
+ 	}
+ 	return filepath.Join(config.WorkDir, "npm")
+ }
+@@ -551,9 +551,6 @@ func extractPackageTarball(installDir string, pkgName string, tarball io.Reader)
+ 		if err != nil {
+ 			return err
+ 		}
+-		// strip tarball root dir
+-		_, name := utils.SplitByFirstByte(h.Name, '/')
+-		filename := path.Join(pkgDir, name)
+ 		if h.Typeflag != tar.TypeReg {
+ 			continue
+ 		}
