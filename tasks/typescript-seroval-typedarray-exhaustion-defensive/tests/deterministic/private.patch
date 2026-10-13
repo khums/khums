@@ -2,7 +2,7 @@ diff --git a/packages/seroval/test/typed-array-holdout.test.ts b/packages/serova
 new file mode 100644
 --- /dev/null
 +++ b/packages/seroval/test/typed-array-holdout.test.ts
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,114 @@
 +import { describe, expect, it } from 'vitest';
 +import { type SerovalTypedArrayNode, fromCrossJSON, fromJSON, toCrossJSON, toJSON } from '../src';
 +import type { SerovalDataViewNode } from '../src/core/types';
@@ -90,6 +90,19 @@ new file mode 100644
 +    expect(rejectionCause(() => fromCrossJSON(node, { refs: new Map([[ref, backing]]) }))).toBe(
 +      'SerovalMalformedNodeError',
 +    );
++  });
++
++  it('rejects DataView nodes referring to non-buffer values', () => {
++    const ref = 706;
++    const node = toCrossJSON(new DataView(new ArrayBuffer(8))) as SerovalDataViewNode;
++    node.f = { t: INDEXED_VALUE, i: ref } as SerovalDataViewNode['f'];
++    node.b = 0;
++    node.l = 4;
++    for (const value of [null, {}, [1, 2, 3, 4], new Uint8Array(8)]) {
++      expect(rejectionCause(() => fromCrossJSON(node, { refs: new Map([[ref, value]]) }))).toBe(
++        'SerovalMalformedNodeError',
++      );
++    }
 +  });
 +
 +  it('preserves a supported DataView and its values', () => {

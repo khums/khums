@@ -59,8 +59,6 @@ def main():
         return 2
     try:
         cfg = json.loads((HERE / "groups.json").read_text())
-        if cfg.get('context'):
-            print('CONTEXT: ' + cfg['context'], flush=True)
         with tempfile.TemporaryDirectory(prefix="public-probe-") as tmp:
             os.chmod(tmp, 0o755)
             work = Path(tmp) / "source"
@@ -112,8 +110,6 @@ def main():
             status = "ERROR" if errors else "PASS" if passed == possible else "FAIL"
             record_result(work, status, passed, possible)
             print(f"SUMMARY: {status} score={passed}/{possible}", flush=True)
-            if status == "FAIL" and cfg.get("failure_context"):
-                print("INVESTIGATION: " + cfg["failure_context"], flush=True)
             if errors:
                 print('VALIDATION ERROR: a command did not complete normally (crash or timeout); this is not a demonstrated behavioral result.', flush=True)
             return 2 if errors else 0 if passed == possible else 1

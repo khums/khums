@@ -33,11 +33,40 @@
     "packages/seroval/test/typed-array-holdout.test.ts"
   ],
   "private_cases": [
-    {"id": "externally_backed_uint16_claim", "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects an oversized Uint16Array claim with a malformed-node error'", "timeout": 180},
-    {"id": "cross_json_claim_boundary", "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects an oversized cross-JSON typed-array claim'", "timeout": 180},
-    {"id": "supported_view", "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'preserves a supported typed-array view and its values'", "timeout": 180},
-    {"id": "non_buffer_backing_sources", "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects non-buffer backing sources with a malformed-node error'", "timeout": 180},
-    {"id": "externally_backed_dataview_claim", "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects an oversized externally backed DataView claim'", "timeout": 180},
-    {"id": "supported_dataview", "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'preserves a supported DataView and its values'", "timeout": 180}
+    {
+      "id": "externally_backed_uint16_claim",
+      "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects an oversized Uint16Array claim with a malformed-node error'",
+      "timeout": 180
+    },
+    {
+      "id": "cross_json_claim_boundary",
+      "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects an oversized cross-JSON typed-array claim'",
+      "timeout": 180
+    },
+    {
+      "id": "supported_view",
+      "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'preserves a supported typed-array view and its values'",
+      "timeout": 180
+    },
+    {
+      "id": "non_buffer_backing_sources",
+      "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects non-buffer backing sources with a malformed-node error'",
+      "timeout": 180
+    },
+    {
+      "id": "externally_backed_dataview_claim",
+      "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects an oversized externally backed DataView claim'",
+      "timeout": 180
+    },
+    {
+      "id": "supported_dataview",
+      "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'preserves a supported DataView and its values'",
+      "timeout": 180
+    },
+    {
+      "id": "non_buffer_dataview_source",
+      "command": "pnpm --filter seroval exec vitest run test/typed-array-holdout.test.ts -t 'rejects DataView nodes referring to non-buffer values'",
+      "timeout": 180
+    }
   ]
 }

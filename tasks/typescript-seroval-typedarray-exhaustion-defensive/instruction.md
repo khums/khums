@@ -16,7 +16,7 @@ Run:
 
 The public reproducer reports grouped behavioral scores over intentionally public, non-secret fixtures. Grouping keeps feedback concise; do not rely on the fixture implementation being confidential. Private scoring uses separate verifier-owned execution after the agent phase.
 
-This task reports groups `G1` through `G4`. Each score reflects behavior actually observed from the submitted source plus compatibility controls; group identifiers do not identify files, functions, or individual requirements.
+This task reports groups `G1` through `G4`. Each group mixes security and compatibility behavior; checks intentionally overlap between groups. Scores indicate completed validations, not distinct requirements. Group identifiers do not identify files, functions, or individual requirements.
 
 | Status | Meaning |
 |---|---|
@@ -27,9 +27,9 @@ This task reports groups `G1` through `G4`. Each score reflects behavior actuall
 Output is intentionally coarse, for example:
 
 ```text
-GROUP G1: PASS score=3/3
-GROUP G2: FAIL score=1/3
-SUMMARY: FAIL score=4/6
+GROUP G1: PASS score=4/4
+GROUP G2: FAIL score=2/4
+SUMMARY: FAIL score=6/8
 ```
 
 Group names and scores are feedback for investigation, not a complete specification. A passing public summary does not guarantee every security or regression invariant is satisfied; thorough source review and focused project tests remain necessary.

@@ -84,16 +84,18 @@ index 219b6027..72401aed 100644
    const result = assignIndexedValue(
 diff --git a/packages/seroval/test/typed-array-limit.test.ts b/packages/seroval/test/typed-array-limit.test.ts
 new file mode 100644
-index 00000000..e72c7790
+index 0000000..4a97865
 --- /dev/null
 +++ b/packages/seroval/test/typed-array-limit.test.ts
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,54 @@
 +import { describe, expect, it } from 'vitest';
 +import {
 +  type SerovalTypedArrayNode,
 +  fromCrossJSON,
++  fromJSON,
 +  serialize,
 +  toCrossJSON,
++  toJSON,
 +} from '../src';
 +
 +// Same cap as the ArrayBuffer deserialization limit (MAX_BASE64_LENGTH).
@@ -131,6 +133,12 @@ index 00000000..e72c7790
 +      expect(() => fromCrossJSON(node, { refs: new Map([[ref, backing]]) })).not.toThrow();
 +      node.l = MAX + 1;
 +      expect((() => { try { fromCrossJSON(node, { refs: new Map([[ref, backing]]) }); } catch (error) { return (error as { cause?: Error }).cause?.constructor.name; } return 'accepted'; })()).toBe('SerovalMalformedNodeError');
++    });
++
++    it('rejects a typed array node whose backing source is not a buffer', () => {
++      const json = toJSON(new Uint8Array([1, 2, 3]));
++      (json.t as SerovalTypedArrayNode).f = { t: 0, s: 64 } as SerovalTypedArrayNode['f'];
++      expect((() => { try { fromJSON(json); } catch (error) { return (error as { cause?: Error }).cause?.constructor.name; } return 'accepted'; })()).toBe('SerovalMalformedNodeError');
 +    });
 +  });
 +});

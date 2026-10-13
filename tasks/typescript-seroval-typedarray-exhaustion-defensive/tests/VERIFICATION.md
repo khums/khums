@@ -7,14 +7,14 @@ evidence log into a root-owned snapshot, then runs the pytest prepass
 never discovers. RewardKit scores only the precomputed rows in a separate
 minimal suite (`check.py`, `verifier.json`, `process/check.py`).
 
-15 weighted rows (total weight 69):
+16 weighted rows (total weight 75):
 
 | Rows | Weight | Purpose |
 |---|---|---|
-| `test_explicit_public_group[G1..G3]` | 5 | Sealed public probe groups (security + compatibility) |
-| `test_explicit_public_group[G4]` | 4 | Upstream BigInt typed-array / DataView suites |
+| `test_explicit_public_group[G1..G3]` | 5 | Sealed public probe groups; overlapping security + compatibility checks |
+| `test_explicit_public_group[G4]` | 4 | Sealed public probe group; overlapping security + compatibility checks |
 | `test_implicit_upstream_behavior[*]` (4) | 4 | Upstream suites and package build in a chrooted replay |
-| `test_private_behavior[*]` security (4) | 6 | Holdout length-cap and non-buffer backing-source cases |
+| `test_private_behavior[*]` security (5) | 6 | Holdout length-cap and non-buffer backing-source cases |
 | `test_private_behavior[supported_*]` (2) | 4 | Supported typed-array / DataView round trips |
 | `test_required_artifacts` | 2 | `plan.md`/`findings.json` contract + evidence that the reported reproducer status/score was actually observed on the submitted source digest |
 
@@ -37,9 +37,15 @@ output, verifier-only `case_semantics.md`).
 (output_quality omitted from the denominator when the judge did not run).
 
 ## Oracle evidence
-Per-command matrix (8 public commands, 4 implicit, 6 private = 18): baseline `56c0284` fails 8 (G1–G3 commands and five private cases).
-`FIX-1` alone: 17/18 (fails `non_buffer_backing_sources`). `FIX-1`+`FIX-2`: 18/18.
+Public probe: 18 executions over 10 distinct commands in four overlapping groups.
+Measured in a local image emulation: no-op 8/18 public; FIX-1 only 16/18 public
+(fails the non-buffer backing-source check in G2 and G4) and 14/16 verifier rows;
+FIX-1 + FIX-2 18/18 public, 16/16 rows, reward 1.0.
 
 ## Fallback
 If staging, freezing or RewardKit fails, observed prepass rows are preserved,
 `verifier_error.json` is written, and the binary reward is 0.
+
+## v12 public probe layout
+
+Four mixed groups run four commands each. Eight unique checks (security-boundary and compatibility) are distributed twice across the groups; the agent receives only aggregate group scores. The probe does not emit diagnostic context or disclose the individual command mapping. Private verifier-owned cases are separate and additionally exercise non-buffer DataView backing sources.

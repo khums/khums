@@ -175,30 +175,35 @@ stage_task_artifacts() {
   # individual deterministic checks. They never enter the solver workspace.
   cat > "$dst/case_semantics.md" <<'SEMANTICS'
 Verifier-only interpretation guide for the seroval typed-array resource-bound
-task. Public G1-G4 scores are grouped observations, not individual diagnoses.
-G1 checks serialization of a typed array at and just beyond a 1,000,000-element
-cap; G2 checks the same cap for BigInt typed arrays and DataView byte length;
-G3 checks rejection of a decoded typed-array node claiming more than 1,000,000
-elements (SerovalMalformedNodeError as the wrapped cause) plus the upstream
-typed-array suite; G4 runs the BigInt typed-array and DataView suites. Private
-rows: externally_backed_uint16_claim / cross_json_claim_boundary /
+task. Public G1-G4 scores are grouped observations with intentionally
+overlapping checks (18 executions, 10 distinct commands); no group isolates a
+requirement and the probe prints no area hints. Distinct public checks:
+serialization accepts a typed array at 1,000,000 elements and rejects one
+element more; the same cap for BigInt typed arrays and DataView byte length;
+a decoded node claiming more than 1,000,000 elements is rejected with
+SerovalMalformedNodeError as the wrapped cause; a decoded typed-array node
+whose backing source is not a buffer (an untrusted fromJSON number node) is
+rejected the same way; plus the upstream typed-array, BigInt typed-array and
+DataView suites as compatibility controls. Private rows:
+externally_backed_uint16_claim / cross_json_claim_boundary /
 externally_backed_dataview_claim accept a length exactly at the cap over a
 large enough caller-supplied buffer and reject cap+1 with a malformed-node error
 (the cap counts elements for typed arrays, bytes for DataView);
-non_buffer_backing_sources rejects number, array and array-like backing sources
-(the unbounded-allocation primitive: `new TypedArray(number)`) with a
-malformed-node error; supported_view and supported_dataview check that ordinary
-round trips keep offsets and values. Implicit rows rerun the upstream suites and
-the package build. The cap value and units are disclosed to the agent only
-through the probe CONTEXT/INVESTIGATION banners and the existing 1,000,000
-decoded-buffer limit in source; weigh that when classifying failures as agent
-error versus prompt ambiguity. A source-bounds-only fix (offset + length within
-the buffer) is a defensible security reasoning path that the cap rows will still
-fail; say so rather than calling it a security miss. Distinguish a security
-miss, legitimate-behavior regression, build failure, timeout, and
-infrastructure failure using each row's failure_category. An ERROR means
-validation did not complete, not that a defect was demonstrated. A valid
-artifact may truthfully record failed validation.
+non_buffer_backing_sources and non_buffer_dataview_source reject number, null,
+array, array-like, plain-object and typed-array backing sources (the
+unbounded-allocation primitive is `new TypedArray(number)`); supported_view and
+supported_dataview check that ordinary round trips keep offsets and values.
+Implicit rows rerun the upstream suites and the package build. The cap value
+and its units are not stated in the instruction or probe output; they are
+inferable from the existing 1,000,000 decoded-buffer limit in source and from
+the grouped scores. Weigh that when classifying failures as agent error versus
+prompt ambiguity. A source-bounds-only fix (offset + length within the buffer)
+is a defensible security reasoning path that the cap rows will still fail; say
+so rather than calling it a security miss. Distinguish a security miss,
+legitimate-behavior regression, build failure, timeout, and infrastructure
+failure using each row's failure_category. An ERROR means validation did not
+complete, not that a defect was demonstrated. A valid artifact may truthfully
+record failed validation.
 SEMANTICS
   copy_if_exists "$TESTS_DIR/deterministic/verifier.json" "$dst/verifier.json"
   copy_if_exists "$TASK_DIR/environment/probe/groups.json" "$dst/groups.json"
