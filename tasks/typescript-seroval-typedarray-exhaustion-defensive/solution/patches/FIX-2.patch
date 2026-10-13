@@ -1,0 +1,33 @@
+diff --git a/packages/seroval/src/core/context/deserializer.ts b/packages/seroval/src/core/context/deserializer.ts
+--- a/packages/seroval/src/core/context/deserializer.ts
++++ b/packages/seroval/src/core/context/deserializer.ts
+@@ -499,7 +499,14 @@ function deserializeTypedArray(
+   const construct = getTypedArrayConstructor(node.c) as Int8ArrayConstructor;
+   const source = deserialize(ctx, depth, node.f) as ArrayBuffer;
++  try {
++    // Validate internal buffer slots without allocating a backing store.
++    // A zero-length DataView also accepts cross-realm and shared buffers.
++    new DataView(source, 0, 0);
++  } catch {
++    throw new SerovalMalformedNodeError(node);
++  }
+   const offset = node.b ?? 0;
+   if (offset < 0 || offset > source.byteLength || node.l > MAX_BASE64_LENGTH) {
+     throw new SerovalMalformedNodeError(node);
+   }
+   const result = assignIndexedValue(
+@@ -517,7 +524,14 @@ function deserializeDataView(
+ ): DataView {
+   const source = deserialize(ctx, depth, node.f) as ArrayBuffer;
++  try {
++    // Validate internal buffer slots without allocating a backing store.
++    // A zero-length DataView also accepts cross-realm and shared buffers.
++    new DataView(source, 0, 0);
++  } catch {
++    throw new SerovalMalformedNodeError(node);
++  }
+   const offset = node.b ?? 0;
+   if (offset < 0 || offset > source.byteLength || node.l > MAX_BASE64_LENGTH) {
+     throw new SerovalMalformedNodeError(node);
+   }
+   const result = assignIndexedValue(

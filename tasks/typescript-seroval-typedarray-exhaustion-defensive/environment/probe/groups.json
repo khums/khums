@@ -1,0 +1,43 @@
+{
+  "test_includes": [
+    "packages/seroval/test/typed-array-limit.test.ts"
+  ],
+  "prepare": "pnpm --filter seroval build",
+  "prepare_timeout": 240,
+  "groups": [
+    {
+      "id": "G1",
+      "timeout": 180,
+      "commands": [
+        "pnpm --filter seroval exec vitest run test/typed-array-limit.test.ts -t 'accepts a typed array at the limit'",
+        "pnpm --filter seroval exec vitest run test/typed-array-limit.test.ts -t 'rejects a typed array over the limit'"
+      ]
+    },
+    {
+      "id": "G2",
+      "timeout": 180,
+      "commands": [
+        "pnpm --filter seroval exec vitest run test/typed-array-limit.test.ts -t 'rejects a bigint typed array over the limit'",
+        "pnpm --filter seroval exec vitest run test/typed-array-limit.test.ts -t 'rejects a DataView over the limit'"
+      ]
+    },
+    {
+      "id": "G3",
+      "timeout": 180,
+      "commands": [
+        "pnpm --filter seroval exec vitest run test/typed-array-limit.test.ts -t 'rejects a typed array node claiming a length over the limit'",
+        "pnpm --filter seroval exec vitest run test/typed-array.test.ts"
+      ]
+    },
+    {
+      "id": "G4",
+      "timeout": 180,
+      "commands": [
+        "pnpm --filter seroval exec vitest run test/bigint-typed-array.test.ts",
+        "pnpm --filter seroval exec vitest run test/data-view.test.ts"
+      ]
+    }
+  ],
+  "context": "Public validation exercises binary typed-array and DataView handling across serialization and deserialization: size bounds consistent with the library's existing decoded-buffer limit, validation of the backing source a decoded view is built over, and compatibility for supported views and values.",
+  "failure_context": "Inspect permitted production source where typed-array and DataView nodes are created and decoded. Bounds apply in the units each node already records (elements for typed arrays, bytes for DataView); preserve supported views, public APIs and the existing malformed-node error convention. Group scores are not a complete specification."
+}

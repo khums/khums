@@ -1,0 +1,106 @@
+diff --git a/packages/seroval/test/typed-array-holdout.test.ts b/packages/seroval/test/typed-array-holdout.test.ts
+new file mode 100644
+--- /dev/null
++++ b/packages/seroval/test/typed-array-holdout.test.ts
+@@ -0,0 +1,101 @@
++import { describe, expect, it } from 'vitest';
++import { type SerovalTypedArrayNode, fromCrossJSON, fromJSON, toCrossJSON, toJSON } from '../src';
++import type { SerovalDataViewNode } from '../src/core/types';
++
++const LIMIT = 1_000_000;
++const INDEXED_VALUE = 4;
++
++function rejectionCause(action: () => unknown): string {
++  try {
++    action();
++    return 'accepted';
++  } catch (error) {
++    return (error as { cause?: Error }).cause?.constructor.name ?? (error as Error).constructor.name;
++  }
++}
++
++function externallyBackedNode(source: Uint8Array | Uint16Array, ref: number): SerovalTypedArrayNode {
++  const node = toCrossJSON(source) as SerovalTypedArrayNode;
++  node.f = { t: INDEXED_VALUE, i: ref } as SerovalTypedArrayNode['f'];
++  node.b = 0;
++  return node;
++}
++
++describe('typed-array decoding boundary', () => {
++  it('rejects an oversized Uint16Array claim with a malformed-node error', () => {
++    const ref = 701;
++    const backing = new ArrayBuffer((LIMIT + 1) * Uint16Array.BYTES_PER_ELEMENT);
++    const node = externallyBackedNode(new Uint16Array([7, 11]), ref);
++    node.l = LIMIT;
++    expect(() => fromCrossJSON(node, { refs: new Map([[ref, backing]]) })).not.toThrow();
++    node.l = LIMIT + 1;
++    expect(rejectionCause(() => fromCrossJSON(node, { refs: new Map([[ref, backing]]) }))).toBe(
++      'SerovalMalformedNodeError',
++    );
++  });
++
++  it('rejects an oversized cross-JSON typed-array claim', () => {
++    const ref = 702;
++    const backing = new ArrayBuffer(LIMIT + 2);
++    const node = externallyBackedNode(new Uint8Array([3, 5]), ref);
++    node.b = 1;
++    node.l = LIMIT;
++    expect(() => fromCrossJSON(node, { refs: new Map([[ref, backing]]) })).not.toThrow();
++    node.l = LIMIT + 1;
++    expect(rejectionCause(() => fromCrossJSON(node, { refs: new Map([[ref, backing]]) }))).toBe(
++      'SerovalMalformedNodeError',
++    );
++  });
++
++  it('preserves a supported typed-array view and its values', () => {
++    const source = new Uint8Array(new Uint8Array([0, 23, 42, 0]).buffer, 1, 2);
++    const result = fromJSON<Uint8Array>(toJSON(source));
++    expect(result).toBeInstanceOf(Uint8Array);
++    expect(Array.from(result)).toEqual([23, 42]);
++  });
++
++  it('rejects non-buffer backing sources with a malformed-node error', () => {
++    const ref = 704;
++    const values = [LIMIT + 1, [7, 11], { length: LIMIT + 1 }];
++    for (const constructor of ['Uint8Array', 'Uint16Array', 'BigInt64Array'] as const) {
++      const node = toCrossJSON(new Uint8Array([7])) as SerovalTypedArrayNode;
++      node.c = constructor;
++      node.b = 0;
++      node.l = 1;
++      node.f = { t: 0, s: LIMIT + 1 } as SerovalTypedArrayNode['f'];
++      expect(rejectionCause(() => fromCrossJSON(node, {}))).toBe('SerovalMalformedNodeError');
++      node.f = { t: INDEXED_VALUE, i: ref } as SerovalTypedArrayNode['f'];
++      for (const value of values) {
++        expect(rejectionCause(() => fromCrossJSON(node, { refs: new Map([[ref, value]]) }))).toBe(
++          'SerovalMalformedNodeError',
++        );
++      }
++    }
++  });
++
++  it('rejects an oversized externally backed DataView claim', () => {
++    const ref = 705;
++    const backing = new ArrayBuffer(LIMIT + 3);
++    const node = toCrossJSON(new DataView(new ArrayBuffer(4))) as SerovalDataViewNode;
++    node.f = { t: INDEXED_VALUE, i: ref } as SerovalDataViewNode['f'];
++    node.b = 2;
++    node.l = LIMIT;
++    expect(() => fromCrossJSON(node, { refs: new Map([[ref, backing]]) })).not.toThrow();
++    node.l = LIMIT + 1;
++    expect(rejectionCause(() => fromCrossJSON(node, { refs: new Map([[ref, backing]]) }))).toBe(
++      'SerovalMalformedNodeError',
++    );
++  });
++
++  it('preserves a supported DataView and its values', () => {
++    const source = new DataView(new ArrayBuffer(8), 2, 4);
++    source.setUint16(0, 0x1234);
++    source.setUint16(2, 0x5678);
++    const result = fromJSON<DataView>(toJSON(source));
++    expect(result).toBeInstanceOf(DataView);
++    expect(result.byteOffset).toBe(source.byteOffset);
++    expect(result.byteLength).toBe(source.byteLength);
++    expect(result.getUint16(0)).toBe(0x1234);
++    expect(result.getUint16(2)).toBe(0x5678);
++  });
++});

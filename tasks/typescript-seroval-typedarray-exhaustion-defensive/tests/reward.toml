@@ -1,0 +1,6 @@
+# Deterministic-only RewardKit aggregation.
+# The final test.sh reward additionally requires the programmatic plan gate.
+[[reward]]
+name = "binary_reward"
+aggregation = "threshold"
+threshold = 1.0
