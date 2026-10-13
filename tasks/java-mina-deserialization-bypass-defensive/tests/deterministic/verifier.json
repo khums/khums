@@ -1,9 +1,7 @@
 {
   "public_groups": [
     "G1",
-    "G2",
-    "G3",
-    "G4"
+    "G2"
   ],
   "public_timeout": 1200,
   "implicit": [
@@ -39,6 +37,10 @@
     {
       "id": "proxy_nested_in_container",
       "generator": "proxy_nested_in_container"
+    },
+    {
+      "id": "proxy_caller_loader",
+      "generator": "proxy_caller_loader"
     },
     {
       "id": "proxy_accepted_control",

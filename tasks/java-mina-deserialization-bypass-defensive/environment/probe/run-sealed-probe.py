@@ -68,8 +68,6 @@ def main():
             if prep and not run(prep, work, cfg.get("prepare_timeout", 300)):
                 print("SUMMARY: ERROR")
                 return 2
-            print("CONTEXT: groups exercise object deserialization through the buffer API "
-                  "with configured class acceptance, plus compatibility and build controls.", flush=True)
             totals, errored = [], False
             for group in cfg["groups"]:
                 results = [run(case, work, group.get("timeout", 180)) for case in group["commands"]]

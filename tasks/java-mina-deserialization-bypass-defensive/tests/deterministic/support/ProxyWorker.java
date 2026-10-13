@@ -7,6 +7,9 @@ import java.io.Serializable;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,7 +22,8 @@ import org.apache.mina.core.buffer.IoBuffer;
  * Fixture-free observation worker for the private verifier.
  *
  * Each stdin line is one case: mode TAB accept-patterns ('|'-separated) TAB items
- * (','-separated). It serializes the described value with IoBuffer, deserializes it
+ * (','-separated) [TAB class directory]. With a class directory, the value is built
+ * and decoded through a child class loader that alone can see that directory. It serializes the described value with IoBuffer, deserializes it
  * through the submitted IoBuffer with the given accept patterns, and prints only
  * what it observed. Expected outcomes and pass/fail decisions live in the trusted
  * verifier process; nothing here encodes an expectation.
@@ -57,6 +61,9 @@ public final class ProxyWorker {
         ClassLoader loader = ProxyWorker.class.getClassLoader();
         IoBuffer buffer;
         try {
+            if (fields.length > 3 && !fields[3].isEmpty()) {
+                loader = new URLClassLoader(new URL[] { Paths.get(fields[3]).toUri().toURL() }, loader);
+            }
             Object value;
             if (mode.equals("list")) {
                 value = new ArrayList<>(Arrays.asList(items));

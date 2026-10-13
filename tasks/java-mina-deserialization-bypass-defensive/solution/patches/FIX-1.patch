@@ -1,18 +1,8 @@
-From 850592195d92acbce1d8be9b341e487b4361512c Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Emmanuel=20L=C3=A9charny?= <emmlec@worteks.com>
-Date: Mon, 25 May 2026 00:43:42 +0200
-Subject: [PATCH] Changed a flag in readClassDescriptor; Added a
- resolveProxyClass implementation
-
----
- .../mina/core/buffer/AbstractIoBuffer.java    | 22 ++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
-
 diff --git a/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java b/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java
-index ce41c9da5..1076c5155 100644
+index ad1cf58..3153c3d 100644
 --- a/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java
 +++ b/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java
-@@ -28,6 +28,7 @@
+@@ -28,6 +28,7 @@ import java.io.ObjectStreamClass;
  import java.io.OutputStream;
  import java.io.Serializable;
  import java.io.StreamCorruptedException;
@@ -20,16 +10,16 @@ index ce41c9da5..1076c5155 100644
  import java.nio.BufferOverflowException;
  import java.nio.BufferUnderflowException;
  import java.nio.ByteBuffer;
-@@ -2194,7 +2195,7 @@ protected ObjectStreamClass readClassDescriptor() throws IOException, ClassNotFo
+@@ -2193,7 +2194,7 @@ public abstract class AbstractIoBuffer extends IoBuffer {
+                             throw new ClassNotFoundException("Class not in accept list " + className);
                          }
  
-                         // Use initialize=false to prevent static block execution during class loading
 -                        Class<?> clazz = Class.forName(className, true, classLoader);
 +                        Class<?> clazz = Class.forName(className, false, classLoader);
  
                          return ObjectStreamClass.lookup(clazz);
  
-@@ -2225,6 +2226,25 @@ protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, Clas
+@@ -2224,6 +2225,25 @@ public abstract class AbstractIoBuffer extends IoBuffer {
                      return super.resolveClass(desc);
                  }
              }

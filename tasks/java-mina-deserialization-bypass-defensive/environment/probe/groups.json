@@ -1,8 +1,21 @@
 {
   "groups": [
-    {"id": "G1", "timeout": 240, "commands": ["mvn -B -ntp -o -pl mina-core -Dtest=PublicBoundaryProbeTest#unacceptedProxyInterfaceIsRejected test"]},
-    {"id": "G2", "timeout": 240, "commands": ["mvn -B -ntp -o -pl mina-core -Dtest=PublicBoundaryProbeTest#acceptedProxyInterfaceStillWorks test"]},
-    {"id": "G3", "timeout": 240, "commands": ["mvn -B -ntp -o -pl mina-core -Dtest=IoBufferTest#testNonSerializableClassAccept test", "mvn -B -ntp -o -pl mina-core -Dtest=IoBufferTest#testNonSerializableClassReject test"]},
-    {"id": "G4", "timeout": 300, "commands": ["mvn -B -ntp -o -pl mina-core -DskipTests package"]}
+    {
+      "id": "G1",
+      "timeout": 420,
+      "commands": [
+        "mvn -B -ntp -o -pl mina-core -Dtest=PublicBoundaryProbeTest#unacceptedProxyInterfaceIsRejected test",
+        "mvn -B -ntp -o -pl mina-core -Dtest=PublicBoundaryProbeTest#acceptedProxyInterfaceStillWorks test",
+        "mvn -B -ntp -o -pl mina-core -Dtest=IoBufferTest#testNonSerializableClassAccept test",
+        "mvn -B -ntp -o -pl mina-core -Dtest=IoBufferTest#testNonSerializableClassReject test"
+      ]
+    },
+    {
+      "id": "G2",
+      "timeout": 300,
+      "commands": [
+        "mvn -B -ntp -o -pl mina-core -DskipTests package"
+      ]
+    }
   ]
 }

@@ -16,7 +16,7 @@ Run:
 
 The public reproducer reports grouped behavioral scores over intentionally public, non-secret fixtures. Grouping keeps feedback concise; do not rely on the fixture implementation being confidential. Private scoring uses separate verifier-owned execution after the agent phase.
 
-This task reports groups `G1` through `G4`. Each score reflects behavior actually observed from the submitted source plus compatibility controls; group identifiers do not identify files, functions, or individual requirements.
+This task reports groups `G1` and `G2`. Each score reflects behavior actually observed from the submitted source plus compatibility controls; group identifiers do not identify files, functions, or individual requirements.
 
 | Status | Meaning |
 |---|---|
@@ -38,7 +38,7 @@ Group names and scores are feedback for investigation, not a complete specificat
 
 In-scope materials are permitted production source under `/testbed/mina-core/src/main` and the read-only public reproducer at `/testbed/reproducer/run-all.sh`.
 
-Out-of-scope materials include existing test trees (for example `src/test`), task tests, solutions, verifier files and fixtures, scoring files, generated output, repository history, and sealed runtime internals (including whatever `/testbed/reproducer/run-all.sh` calls out to). You may run `/testbed/reproducer/run-all.sh` as documented above, but do not modify it, and do not attempt to read, modify, or otherwise inspect any of the other out-of-scope materials. Tests created for investigation must stay outside the submitted source tree. Preserve public APIs, established error conventions, and existing supported inputs where directly implicated by the hardening work.
+Out-of-scope materials include existing test trees (for example `src/test`), task tests, solutions, verifier files and fixtures, scoring files, generated output, repository history, and sealed runtime internals (including whatever `/testbed/reproducer/run-all.sh` calls out to). You may run `/testbed/reproducer/run-all.sh` as documented above, but do not modify it, and do not attempt to read, modify, or otherwise inspect any of the other out-of-scope materials. This includes indirect inspection: do not list, search or sweep existing test trees, run build goals that compile or execute existing tests (such as `test-compile` or `test`), or read compiled test output and reports. An attempt that is denied by file permissions still counts as an attempt. Tests created for investigation must stay outside the submitted source tree. Preserve public APIs, established error conventions, and existing supported inputs where directly implicated by the hardening work.
 
 ## Required outputs
 

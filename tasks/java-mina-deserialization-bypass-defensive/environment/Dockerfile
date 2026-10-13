@@ -11,6 +11,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
     && cd /src && git checkout --detach "${BASELINE_COMMIT}" \
     && test "$(git rev-parse HEAD)" = "${BASELINE_COMMIT}" && rm -rf .git
 WORKDIR /src
+# The snapshot carries a stale comment describing behavior the code does not have;
+# drop it so source comments do not point at the defective block. Baseline and
+# testbed are both derived from this tree, so they stay identical.
+RUN sed -i '/Use initialize=false to prevent static block execution/d' \
+      mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java \
+    && ! grep -q 'Use initialize=false to prevent' mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java
 RUN mvn -B -ntp -pl mina-core -am -DskipTests package \
     && mvn -B -ntp -pl mina-core -Dtest=IoBufferTest test
 
@@ -43,6 +49,8 @@ RUN if [ -d /opt/task-assets/reproducer ]; then cp -a /opt/task-assets/reproduce
     && printf '%s\n' 'agent ALL=(root) NOPASSWD: /usr/local/bin/run-sealed-probe public' >/etc/sudoers.d/public-probe && chmod 0440 /etc/sudoers.d/public-probe \
     && chown -R agent:agent /testbed/mina-core/src/main /app/output \
     && find /testbed -type d -path '*/src/test' -prune -exec chown -R root:root {} + -exec chmod 0700 {} + \
+    && find /testbed -type d -path '*/target/*' \( -name test-classes -o -name surefire-reports -o -name generated-test-sources -o -name testCompile \) -prune -exec rm -rf {} + \
+    && test -z "$(find /testbed -type d -path '*/target/*' \( -name test-classes -o -name surefire-reports -o -name testCompile \))" \
     && chmod 0555 /testbed && test ! -e /testbed/.git \
     && runuser -u agent -- test ! -r /testbed/mina-core/src/test \
     && runuser -u agent -- test -w /testbed/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java \

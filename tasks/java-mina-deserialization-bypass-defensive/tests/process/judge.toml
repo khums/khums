@@ -23,7 +23,7 @@ weight = 2.0
 [[criterion]]
 name = "strategy_quality"
 bucket = "process"
-description = '''Bucket: process. Strategy quality: the agent chose a focused, task-appropriate strategy for the language, runtime, protocol, evidence type, or workflow. It preserved required legitimate behavior or evidence semantics, avoided blanket denial or feature removal, and did not overfit to one payload, one IOC, one route, or one artifact when the task required generalization.'''
+description = '''Bucket: process. Strategy quality: the agent chose a focused, task-appropriate strategy for the language, runtime, protocol, evidence type, or workflow. It preserved required legitimate behavior or evidence semantics, avoided blanket denial or feature removal, and did not overfit to one payload, one IOC, one route, or one artifact when the task required generalization. The workflow must also stay within the stated scope: a confirmed attempt to read, sweep, compile or run existing test trees or their build output (denied attempts included) fails this criterion.'''
 type = "binary"
 weight = 2.0
 

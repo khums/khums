@@ -26,7 +26,7 @@ printf '%s\n' \
   'Descriptor inspection also called Class.forName with initialization enabled. Merely examining a serialized class descriptor could consequently execute static initialization before deserialization acceptance was complete.' \
   '' \
   '## Production changes' \
-  'Override resolveProxyClass to require every proxy interface name to match the configured accept list, load accepted interfaces without initialization through the caller-provided class loader, and construct the proxy class from those validated interfaces.' \
+  'Override resolveProxyClass to require every proxy interface name to match the configured accept list, load accepted interfaces without initialization through the caller-provided class loader (not the default latest-user-defined loader), and construct the proxy class from those validated interfaces.' \
   '' \
   'Load classes during descriptor inspection with initialization disabled.' \
   '' \
@@ -34,7 +34,7 @@ printf '%s\n' \
   'Accepted ordinary serializable classes remain supported. Dynamic proxies continue to deserialize when both their invocation handler and every proxy interface are explicitly accepted. Public method signatures and the existing ClassNotFoundException rejection convention are unchanged.' \
   '' \
   '## Validation' \
-  '/testbed/reproducer/run-all.sh: PASS observed for groups G1, G2, G3, and G4.' > /app/output/plan.md
+  '/testbed/reproducer/run-all.sh: PASS observed for groups G1 and G2.' > /app/output/plan.md
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -50,10 +50,10 @@ data = {
         "behavior_before_fix": "A proxy interface was resolved without being checked against acceptMatchers, and readClassDescriptor used Class.forName with initialization enabled.",
         "remediation": "Validate every proxy interface against acceptMatchers, load accepted interfaces through the configured loader without initialization, and disable initialization during descriptor lookup.",
         "behavior_after_fix": "A proxy containing an unaccepted interface is rejected with ClassNotFoundException, while explicitly accepted proxies and existing ordinary serialization behavior continue to work.",
-        "verification": "/testbed/reproducer/run-all.sh: groups G1, G2, G3, and G4 all PASS"
+        "verification": "/testbed/reproducer/run-all.sh: groups G1 and G2 all PASS"
     }],
     "preserved_legitimate_behaviors": ["Accepted ordinary object deserialization", "Dynamic-proxy deserialization when the handler and every interface are accepted", "Existing public APIs and ClassNotFoundException rejection behavior"],
-    "verification_runs": [{"command": "/testbed/reproducer/run-all.sh", "result": "PASS for G1, G2, G3, and G4"}]
+    "verification_runs": [{"command": "/testbed/reproducer/run-all.sh", "result": "PASS for G1 and G2"}]
 }
 Path("/app/output/findings.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 PY

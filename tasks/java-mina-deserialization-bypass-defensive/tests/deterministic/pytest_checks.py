@@ -136,9 +136,29 @@ def built_tree():
             code, out, err = _as_worker(["javac", "-proc:none", "-nowarn", "-cp", str(classes),
                                          "-d", str(worker_dir), str(worker_dir / "ProxyWorker.java")], tree, 180)
             tree["worker"] = (code, (out + err)[-1500:], worker_dir)
+            if code == 0:
+                tree["hidden"] = _compile_hidden(tree)
         yield tree
     finally:
         _dispose(tree)
+
+
+def _compile_hidden(tree: dict) -> dict:
+    """Fresh interfaces visible only through a caller-supplied class loader (never on the classpath)."""
+    hidden_dir = tree["home"] / "hidden"
+    source_dir = tree["home"] / "hidden-src"
+    names = []
+    for _ in range(4):
+        package, simple = f"h{secrets.token_hex(4)}", f"Port{secrets.token_hex(3).upper()}"
+        target = source_dir / package / f"{simple}.java"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f"package {package};\npublic interface {simple} {{ }}\n", encoding="utf-8")
+        names.append(f"{package}.{simple}")
+    hidden_dir.mkdir()
+    subprocess.run(["chown", "-R", f"{WORKER_USER}:{WORKER_USER}", str(hidden_dir), str(source_dir)], check=True)
+    sources = [str(p) for p in sorted(source_dir.rglob("*.java"))]
+    code, out, err = _as_worker(["javac", "-proc:none", "-nowarn", "-d", str(hidden_dir), *sources], tree, 120)
+    return {"code": code, "log": (out + err)[-800:], "dir": str(hidden_dir), "names": names}
 
 
 def _runtime_classpath(tree: dict) -> str:
@@ -161,7 +181,7 @@ def _exact(names):
     return list(names)
 
 
-def _draw(kind: str, rng: random.Random) -> dict:
+def _draw(kind: str, rng: random.Random, hidden: dict | None = None) -> dict:
     """One case: worker input plus the trusted expectation."""
     if kind == "proxy_single_unaccepted":
         iface = rng.choice(POOL)
@@ -196,6 +216,13 @@ def _draw(kind: str, rng: random.Random) -> dict:
         if mode == "proxy_in_list":
             patterns.append("java.util.ArrayList")
         return {"mode": mode, "patterns": patterns, "items": ifaces}
+    if kind == "proxy_caller_loader":
+        # getObject(ClassLoader) resolves classes "using the specified classLoader"; an
+        # accepted proxy whose interfaces only that loader can see must be restored from it.
+        ifaces = rng.sample(hidden["names"], rng.randint(1, 2)) + rng.sample(POOL, rng.randint(0, 1))
+        rng.shuffle(ifaces)
+        patterns = list(BASE) + [n.rsplit(".", 1)[0] + ".*" if rng.random() < 0.5 else n for n in ifaces]
+        return {"mode": "proxy", "patterns": patterns, "items": ifaces, "loader": hidden["dir"]}
     if kind == "object_roundtrip_control":
         return {"mode": "list", "patterns": ["java.util.ArrayList"],
                 "items": [secrets.token_hex(6) for _ in range(rng.randint(1, 4))]}
@@ -237,9 +264,12 @@ def test_private_behavior(case, built_tree):
     assert code == 0, f"submitted source failed to build: {log}"
     wcode, wlog, _ = built_tree["worker"]
     assert wcode == 0, f"VALIDATION_ERROR: worker failed to compile against submitted classes: {wlog}"
+    hidden = built_tree.get("hidden") or {}
+    assert hidden.get("code") == 0, f"VALIDATION_ERROR: hidden interfaces failed to compile: {hidden.get('log')}"
     rng = random.Random(secrets.randbits(64))
-    cases = [_draw(case["generator"], rng) for _ in range(DRAWS)]
-    stdin = "".join(f"{c['mode']}\t{'|'.join(c['patterns'])}\t{','.join(c['items'])}\n" for c in cases)
+    cases = [_draw(case["generator"], rng, hidden) for _ in range(DRAWS)]
+    stdin = "".join(f"{c['mode']}\t{'|'.join(c['patterns'])}\t{','.join(c['items'])}\t{c.get('loader', '')}\n"
+                    for c in cases)
     code, out, err = _as_worker(["java", "-cp", _runtime_classpath(built_tree), "ProxyWorker"],
                                 built_tree, case.get("timeout", 120), stdin=stdin)
     assert code == 0, f"VALIDATION_ERROR: worker exited {code}: {err[-600:]}"

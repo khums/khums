@@ -5,7 +5,7 @@ author_organization = "Turing"
 category = "cybersecurity"
 benchmark_type = "cyber-bench"
 tags = ["defensive", "source-audit", "java", "deserialization", "security-hardening"]
-expert_time_estimate_hours = 6.0
+expert_time_estimate_hours = 2.0
 
 [verifier]
 timeout_sec = 1200.0

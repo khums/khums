@@ -17,26 +17,27 @@ NAMES += [f"test_private_behavior[{case['id']}]" for case in CONFIG["private_cas
 NAMES += [f"test_implicit_upstream_behavior[{case['id']}]" for case in CONFIG["implicit"]]
 NAMES += ["test_required_artifacts"]
 # Weights follow the protected effect each row observes; overlapping checks are
-# grouped so no effect is counted twice. Core security: a serialized object whose
-# classes (including every dynamic-proxy interface) are not all accepted is
-# rejected (>= 60%). Secondary: accepted proxies and ordinary objects still
-# deserialize, ordinary unaccepted classes stay rejected, upstream compatibility
-# (G3 and IoBufferTest share one budget), compilation (G4 and core_build share
-# one budget), and the artifact contract (<= 40%).
+# grouped so no effect is counted twice. Core security (>= 60%): a serialized
+# object whose classes, including every dynamic-proxy interface, are not all
+# accepted is rejected, and accepted proxy interfaces are resolved only through
+# the caller-supplied class loader. G1 mixes the public boundary, an accepted
+# proxy and upstream accept/reject tests, so it is weighted below any single
+# holdout. Secondary (<= 40%): legitimate deserialization controls, upstream
+# compatibility, compilation (G2 and core_build share one budget) and the
+# artifact contract.
 ROWS = {
-    "test_explicit_public_group[G1]": ("core_security", "proxy_interface_filtering", 12),
+    "test_explicit_public_group[G1]": ("core_security", "proxy_interface_filtering", 10),
     "test_private_behavior[proxy_single_unaccepted]": ("core_security", "proxy_interface_filtering", 13),
     "test_private_behavior[proxy_partial_accept]": ("core_security", "proxy_interface_filtering", 13),
-    "test_private_behavior[proxy_wildcard_scope]": ("core_security", "proxy_interface_filtering", 12),
-    "test_private_behavior[proxy_nested_in_container]": ("core_security", "proxy_interface_filtering", 12),
-    "test_explicit_public_group[G2]": ("secondary", "accepted_proxy_preserved", 6),
-    "test_private_behavior[proxy_accepted_control]": ("secondary", "accepted_proxy_preserved", 6),
+    "test_private_behavior[proxy_wildcard_scope]": ("core_security", "proxy_interface_filtering", 11),
+    "test_private_behavior[proxy_nested_in_container]": ("core_security", "proxy_interface_filtering", 11),
+    "test_private_behavior[proxy_caller_loader]": ("core_security", "class_resolution_scope", 12),
+    "test_private_behavior[proxy_accepted_control]": ("secondary", "accepted_proxy_preserved", 8),
     "test_private_behavior[object_roundtrip_control]": ("secondary", "ordinary_object_preserved", 4),
     "test_private_behavior[unaccepted_class_control]": ("secondary", "class_filtering_retained", 4),
-    "test_explicit_public_group[G3]": ("secondary", "upstream_compatibility", 4),
     "test_implicit_upstream_behavior[buffer_object_regressions]": ("secondary", "upstream_compatibility", 4),
     "test_implicit_upstream_behavior[serialization_decoder_regressions]": ("secondary", "decoder_compatibility", 4),
-    "test_explicit_public_group[G4]": ("secondary", "compilation", 2),
+    "test_explicit_public_group[G2]": ("secondary", "compilation", 2),
     "test_implicit_upstream_behavior[core_build]": ("secondary", "compilation", 2),
     "test_required_artifacts": ("secondary", "artifact_contract", 2),
 }
