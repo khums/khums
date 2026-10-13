@@ -1,0 +1,50 @@
+[judge]
+judge = "anthropic/claude-sonnet-4-6"
+prompt_template = "../judge_prompt.md"
+files = ["/logs/verifier/judge_inputs"]
+# Process contributes 20% of final continuous_reward in tests/test.sh, gated by
+# process/check.py. This judge weight is kept positive for the judge pass and UI.
+weight = 0.3636
+
+[[criterion]]
+name = "subsystem_identification"
+bucket = "process"
+description = '''Bucket: process. Subsystem identification: trajectory.json and plan.md show that the agent identified the relevant in-scope subsystem(s), surfaces, artifacts, evidence groups, services, protocols, or data sources before making substantive changes or conclusions. If plan.md is missing or empty in process_artifacts.json, this criterion should fail.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "root_cause_tracing"
+bucket = "process"
+description = '''Bucket: process. Root-cause or evidence tracing: the agent traced the result to the underlying primitive, trust boundary, artifact relationship, exploit mechanism, evidence chain, detection condition, or incident sequence rather than only treating a surface symptom or generic pattern. The reasoning connects observations to security impact and explains why shallow alternatives would be insufficient.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "strategy_quality"
+bucket = "process"
+description = '''Bucket: process. Strategy quality: the agent chose a focused, task-appropriate strategy for the language, runtime, protocol, evidence type, or workflow. It preserved required legitimate behavior or evidence semantics, avoided blanket denial or feature removal, and did not overfit to one payload, one IOC, one route, or one artifact when the task required generalization.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "verification_quality"
+bucket = "process"
+description = '''Bucket: process. Verification quality: the agent checked both sides of the task where applicable: unsafe behavior blocked and legitimate behavior preserved, exploit/proof creates the required effect and controls fail, detection matches malicious variants and avoids benign near-misses, or incident conclusions are cross-checked against independent evidence. Credit builds, deterministic tests, targeted probes, replay checks, holdout checks, and equivalent local verification shown in trajectory.json or plan.md.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "evidence_use_self_undermining"
+bucket = "process"
+description = '''Bucket: process. Evidence use and self-undermining: the agent used observed responses, logs, artifacts, source, deterministic output, and trajectory evidence coherently, and did not undermine itself by abandoning a working primitive, ignoring clear failing-test evidence, attacking the wrong surface after locating the right one, reverting a correct fix, or overfitting to a one-off condition while recognizing a broader class.'''
+type = "binary"
+weight = 2.0
+
+[[criterion]]
+name = "expected_vs_actual_deviation_analysis"
+bucket = "process"
+description = '''Bucket: process. Expected-vs-actual deviation analysis: trajectory.json and plan.md show that the agent compared what instruction.md required against what its artifact, patch, proof, detection rule, or analysis actually did; identified the specific step where any deviation occurred; and considered whether the relevant instruction was clear before treating a failure as agent error, prompt ambiguity, environment issue, or verifier issue.'''
+type = "binary"
+weight = 2.0
+

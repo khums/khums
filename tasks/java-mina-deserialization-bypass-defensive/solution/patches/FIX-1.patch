@@ -1,0 +1,57 @@
+From 850592195d92acbce1d8be9b341e487b4361512c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Emmanuel=20L=C3=A9charny?= <emmlec@worteks.com>
+Date: Mon, 25 May 2026 00:43:42 +0200
+Subject: [PATCH] Changed a flag in readClassDescriptor; Added a
+ resolveProxyClass implementation
+
+---
+ .../mina/core/buffer/AbstractIoBuffer.java    | 22 ++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java b/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java
+index ce41c9da5..1076c5155 100644
+--- a/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java
++++ b/mina-core/src/main/java/org/apache/mina/core/buffer/AbstractIoBuffer.java
+@@ -28,6 +28,7 @@
+ import java.io.OutputStream;
+ import java.io.Serializable;
+ import java.io.StreamCorruptedException;
++import java.lang.reflect.Proxy;
+ import java.nio.BufferOverflowException;
+ import java.nio.BufferUnderflowException;
+ import java.nio.ByteBuffer;
+@@ -2194,7 +2195,7 @@ protected ObjectStreamClass readClassDescriptor() throws IOException, ClassNotFo
+                         }
+ 
+                         // Use initialize=false to prevent static block execution during class loading
+-                        Class<?> clazz = Class.forName(className, true, classLoader);
++                        Class<?> clazz = Class.forName(className, false, classLoader);
+ 
+                         return ObjectStreamClass.lookup(clazz);
+ 
+@@ -2225,6 +2226,25 @@ protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, Clas
+                     return super.resolveClass(desc);
+                 }
+             }
++            
++            @Override
++            protected Class<?> resolveProxyClass(String[] interfaces) throws IOException, ClassNotFoundException {
++                Class<?>[] classes = new Class<?>[interfaces.length];
++                int i = 0;
++
++                for (String interfaceName : interfaces) {
++                    if (!acceptMatchers.stream().anyMatch(m -> m.matches(interfaceName))) {
++                        throw new ClassNotFoundException("Interface not in accept list " + interfaceName);
++                    }
++                    
++                    // Use Class.forName(name, false, loader) — initialize=false — and load via
++                    // the configured classLoader, NOT latestUserDefinedLoader().
++                    classes[i++] = Class.forName(interfaceName, false, classLoader);
++                }
++                
++                
++                return Proxy.getProxyClass(classLoader, classes);
++            }
+         }) {
+             return in.readObject();
+         } catch (IOException e) {

@@ -1,0 +1,56 @@
+{
+  "public_groups": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "public_timeout": 1200,
+  "implicit": [
+    {
+      "id": "buffer_object_regressions",
+      "command": "mvn -B -ntp -o -pl mina-core -Dtest=IoBufferTest test",
+      "timeout": 900
+    },
+    {
+      "id": "serialization_decoder_regressions",
+      "command": "mvn -B -ntp -o -pl mina-core -Dtest=ObjectSerializationTest test",
+      "timeout": 420
+    },
+    {
+      "id": "core_build",
+      "command": "mvn -B -ntp -o -pl mina-core -am -DskipTests package",
+      "timeout": 600
+    }
+  ],
+  "private_cases": [
+    {
+      "id": "proxy_single_unaccepted",
+      "generator": "proxy_single_unaccepted"
+    },
+    {
+      "id": "proxy_partial_accept",
+      "generator": "proxy_partial_accept"
+    },
+    {
+      "id": "proxy_wildcard_scope",
+      "generator": "proxy_wildcard_scope"
+    },
+    {
+      "id": "proxy_nested_in_container",
+      "generator": "proxy_nested_in_container"
+    },
+    {
+      "id": "proxy_accepted_control",
+      "generator": "proxy_accepted_control"
+    },
+    {
+      "id": "object_roundtrip_control",
+      "generator": "object_roundtrip_control"
+    },
+    {
+      "id": "unaccepted_class_control",
+      "generator": "unaccepted_class_control"
+    }
+  ]
+}
