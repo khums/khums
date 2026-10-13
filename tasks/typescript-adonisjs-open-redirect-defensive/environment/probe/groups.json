@@ -1,0 +1,53 @@
+{
+  "test_includes": [
+    "tests/redirect.spec.ts",
+    "tests/router/url_builder.spec.ts"
+  ],
+  "prepare": "npm run build",
+  "prepare_timeout": 240,
+  "groups": [
+    {
+      "id": "G1",
+      "area": "generated route URLs",
+      "timeout": 180,
+      "commands": [
+        "npm run quick:test -- --files tests/router/url_builder.spec.ts --tests='encode route params as path segments'",
+        "npm run quick:test -- --files tests/redirect.spec.ts --tests='encode route params before redirecting'",
+        "npm run quick:test -- --files tests/public_redirect_contract.spec.ts --tests='route prefix preserves external destination and encoded params'",
+        "npm run quick:test -- --files tests/public_route_boundary.spec.ts --tests='redirect preserves query with a route value'"
+      ]
+    },
+    {
+      "id": "G2",
+      "area": "redirect destination compatibility",
+      "timeout": 180,
+      "commands": [
+        "npm run quick:test -- --files tests/public_redirect_contract.spec.ts --tests='direct location setters preserve explicit references'",
+        "npm run quick:test -- --files tests/public_redirect_contract.spec.ts --tests='explicit external destination preserves location with a request host'",
+        "npm run quick:test -- --files tests/public_redirect_contract.spec.ts --tests='local and same host destinations remain supported'",
+        "npm run quick:test -- --files tests/public_redirect_contract.spec.ts --tests='referrer destination rejects an unapproved external host'"
+      ]
+    },
+    {
+      "id": "G3",
+      "area": "forwarded host and response headers",
+      "timeout": 180,
+      "commands": [
+        "npm run quick:test -- --files tests/public_http_boundaries.spec.ts --tests='trusted proxy selects first forwarded host'",
+        "npm run quick:test -- --files tests/public_http_boundaries.spec.ts --tests='untrusted proxy does not override original host'",
+        "npm run quick:test -- --files tests/public_http_boundaries.spec.ts --tests='native response preserves multiple cookies'",
+        "npm run quick:test -- --files tests/public_http_boundaries.spec.ts --tests='native response retains pre-existing cookies'"
+      ]
+    },
+    {
+      "id": "G4",
+      "area": "redirect query forwarding",
+      "timeout": 180,
+      "commands": [
+        "npm run quick:test -- --files tests/public_http_boundaries.spec.ts --tests='redirect inherits global query-forwarding default'",
+        "npm run quick:test -- --files tests/public_http_boundaries.spec.ts --tests='redirect explicitly disables inherited forwarding'",
+        "npm run quick:test -- --files tests/public_http_boundaries.spec.ts --tests='redirect explicitly enables forwarding'"
+      ]
+    }
+  ]
+}

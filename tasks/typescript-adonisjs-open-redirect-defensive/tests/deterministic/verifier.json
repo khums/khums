@@ -1,0 +1,76 @@
+{
+  "public_groups": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "public_timeout": 900,
+  "implicit": [
+    {
+      "id": "type_contract",
+      "command": "npm run typecheck",
+      "timeout": 240
+    },
+    {
+      "id": "production_build",
+      "command": "npm run build",
+      "timeout": 240
+    }
+  ],
+  "private_cases": [
+    "named_segment",
+    "wildcard_segment",
+    "supported_segment",
+    "nested_query",
+    "optional_segment",
+    "wildcard_unicode"
+  ],
+  "implicit_redirect_cases": [
+    "explicit_external_https",
+    "explicit_external_http_port",
+    "explicit_external_outside_referrer_allowlist",
+    "fluent_external_query_status",
+    "route_external_prefix",
+    "route_external_prefix_named_segment",
+    "route_external_prefix_wildcard",
+    "route_external_prefix_query_status",
+    "relative_destination",
+    "same_host_absolute_destination",
+    "referrer_external_rejected",
+    "referrer_same_host_preserved",
+    "referrer_allowlisted_external_preserved",
+    "back_query_disabled_config",
+    "back_query_disabled_fluent",
+    "back_query_cleared",
+    "back_custom_query_without_forwarding",
+    "back_query_enabled_config",
+    "back_query_enabled_fluent",
+    "back_query_forwarded_merge",
+    "back_query_rejected_referrer",
+    "back_encoded_root_relative",
+    "back_encoded_root_relative_query",
+    "back_encoded_interior_control",
+    "back_encoded_absolute_control",
+    "back_generated_named_destination",
+    "back_generated_wildcard_destination",
+    "location_parent_relative",
+    "location_query_only",
+    "header_parent_relative",
+    "header_query_only",
+    "location_external_outside_referrer_allowlist",
+    "header_external_outside_referrer_allowlist"
+  ],
+  "private_http_cases": [
+    "proxy_multi_hop",
+    "proxy_untrusted",
+    "proxy_single_host",
+    "cookies_multiple_attributes",
+    "cookies_append_existing",
+    "cookies_no_native",
+    "query_inherit",
+    "query_disable",
+    "query_enable",
+    "query_override_explicit"
+  ]
+}

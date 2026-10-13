@@ -1,0 +1,10 @@
+# Parsed natively by harbor-rewardkit >= 0.1.5.
+# binary_reward = 1.0 iff every weighted deterministic check passes AND
+#                 the programmatic process gate confirms plan.md exists.
+# Semantic judge dimensions are reported for continuous/process review only
+# and are skipped when no real agent trajectory/API key is available.
+[[reward]]
+name = "binary_reward"
+aggregation = "threshold"
+threshold = 1.0
+
