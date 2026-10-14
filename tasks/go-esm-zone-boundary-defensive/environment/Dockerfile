@@ -8,12 +8,14 @@ RUN git clone --no-checkout https://github.com/esm-dev/esm.sh.git . \
     && git checkout e5296da490fdc779affb5016557c755e0e217c1c \
     && rm -rf .git
 RUN go mod download
-RUN go build -o esmd ./server/esmd
+# Build check only: the binary is written outside the source tree, so /testbed
+# ships no build output (the instruction asks the solver to leave none).
+RUN go build -o /tmp/esmd-buildcheck ./server/esmd && rm -f /tmp/esmd-buildcheck
 
 # Sealed reproducer harness: compiled here from source that is NEVER copied
 # into the runtime image, so a solver cannot recover the exact per-case
 # fixture construction (payload shapes) by reading it -- it behaves like
-# /testbed/esmd itself under `grep`/`cat`: a binary-file match, no content.
+# any compiled binary under `grep`/`cat`: a binary-file match, no content.
 # This source only reaches the distributable task package as a build input
 # (needed to rebuild the image), never the running container's /testbed.
 COPY reproducer/harness.go /harness-src/harness.go
@@ -81,7 +83,8 @@ RUN chown -R root:root /testbed/reproducer \
 # Baseline snapshot (taken after the reproducer is in place, matching what the agent
 # actually starts from) for the verifier's scope-compliance check. Root-owned,
 # unreadable by the agent, so the diff target itself cannot be tampered with.
-RUN mkdir -p /opt/task-baseline && \
+RUN test ! -e /testbed/esmd && test ! -e /testbed/esm.sh && \
+    mkdir -p /opt/task-baseline && \
     cp -a /testbed/. /opt/task-baseline/ && \
     find /testbed -mindepth 1 -printf '%P\t%m\t%y\t%l\n' > /opt/task-baseline-modes.tsv && \
     chown -R root:root /opt/task-baseline && chmod -R go-rwx /opt/task-baseline && \
